@@ -33,7 +33,7 @@ class TestDocs:
     async def test_exposes_docs_outside_production(self, settings: Settings) -> None:
         assert await _get(settings, "/docs") == 200
 
-    async def test_hides_docs_in_production(self) -> None:
-        settings = Settings(environment="production")
+    async def test_hides_docs_in_production(self, settings: Settings) -> None:
+        settings = settings.model_copy(update={"environment": "production"})
 
         assert await _get(settings, "/docs") == 404

@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,9 +19,10 @@ class Settings(BaseSettings):
     app_name: str = "Task Master API"
     environment: Literal["development", "test", "production"] = "development"
     cors_origins: list[str] = ["http://localhost:5173"]
+    database_url: SecretStr
 
 
 @lru_cache
 def get_settings() -> Settings:
     """Return the cached application settings."""
-    return Settings()
+    return Settings()  # pyright: ignore[reportCallIssue]
