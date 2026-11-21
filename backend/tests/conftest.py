@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.config import Settings
 from task_master.database import create_engine
+from task_master.dependencies import get_session
 from task_master.main import create_app
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
@@ -42,6 +43,7 @@ def settings() -> Settings:
         environment="test",
         cors_origins=["http://test.local"],
         database_url=SecretStr("postgresql+asyncpg://unused@localhost/unused"),
+        auth_secret=SecretStr("test-auth-secret"),
     )
 
 
@@ -98,3 +100,19 @@ async def db_session(migrated_db: str) -> AsyncIterator[AsyncSession]:
             await session.close()
             await transaction.rollback()
     await engine.dispose()
+
+
+@pytest.fixture
+async def api_client(
+    settings: Settings, db_session: AsyncSession
+) -> AsyncIterator[AsyncClient]:
+    """HTTPS client whose requests share the rolled-back test session."""
+
+    async def override_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app = create_app(settings)
+    app.dependency_overrides[get_session] = override_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="https://test") as client:
+        yield client

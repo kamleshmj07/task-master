@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     cors_origins: list[str] = ["http://localhost:5173"]
     database_url: SecretStr
+    auth_secret: SecretStr
+    access_token_lifetime_seconds: int = 15 * 60
+    refresh_token_lifetime_days: int = 30
+    auth_rate_limit: str = "5/minute"
 
 
 @lru_cache

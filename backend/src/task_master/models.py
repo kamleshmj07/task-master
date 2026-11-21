@@ -1,8 +1,9 @@
 """SQLAlchemy ORM models for the MVP domain."""
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,
@@ -99,14 +100,63 @@ class User(TimestampMixin, Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(1024))
-    is_active: Mapped[bool] = mapped_column(default=True)
-    is_superuser: Mapped[bool] = mapped_column(default=False)
-    is_verified: Mapped[bool] = mapped_column(default=False)
+    if TYPE_CHECKING:
+        # Plain types so `User` satisfies fastapi-users' `UserProtocol`.
+        id: uuid.UUID
+        email: str
+        hashed_password: str
+        is_active: bool
+        is_superuser: bool
+        is_verified: bool
+    else:
+        id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+        email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+        hashed_password: Mapped[str] = mapped_column(String(1024))
+        is_active: Mapped[bool] = mapped_column(default=True)
+        is_superuser: Mapped[bool] = mapped_column(default=False)
+        is_verified: Mapped[bool] = mapped_column(default=False)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     daily_capacity_minutes: Mapped[int] = mapped_column(default=480)
+
+
+def utc_now() -> datetime:
+    """Current time as an aware UTC datetime."""
+    return datetime.now(UTC)
+
+
+class AccessToken(Base):
+    """Short-lived opaque bearer token; deleting the row revokes it."""
+
+    __tablename__ = "access_token"
+
+    token: Mapped[str] = mapped_column(String(43), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+
+class RefreshToken(Base):
+    """Single-use refresh token. Only its SHA-256 hash is stored.
+
+    Rotation keeps a `family_id`, so reuse of a spent token revokes the family.
+    """
+
+    __tablename__ = "refresh_token"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    family_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Goal(TimestampMixin, Base):

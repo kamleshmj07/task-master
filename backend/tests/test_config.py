@@ -22,6 +22,7 @@ def load_settings() -> Settings:
 def database_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """Provide the required database URL."""
     monkeypatch.setenv("TASK_MASTER_DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
+    monkeypatch.setenv("TASK_MASTER_AUTH_SECRET", "s3cret-value")
 
 
 class TestSettings:
@@ -54,3 +55,12 @@ class TestSettings:
 
     def test_hides_database_url_in_repr(self) -> None:
         assert "u:p@h" not in repr(load_settings())
+
+    def test_hides_auth_secret_in_repr(self) -> None:
+        assert "s3cret-value" not in repr(load_settings())
+
+    def test_requires_auth_secret(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("TASK_MASTER_AUTH_SECRET")
+
+        with pytest.raises(ValidationError):
+            load_settings()
