@@ -13,7 +13,7 @@ from task_master.auth.schemas import UserCreate, UserRead, UserUpdate
 from task_master.auth.users import fastapi_users
 from task_master.config import Settings, get_settings
 from task_master.database import create_engine, create_session_factory
-from task_master.routes import goals, health, tasks
+from task_master.routes import goals, health, postponements, tasks
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -77,3 +77,4 @@ def _include_routers(app: FastAPI) -> None:
     )
     app.include_router(goals.router)
     app.include_router(tasks.router)
+    app.include_router(postponements.router)

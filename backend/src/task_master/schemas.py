@@ -1,4 +1,4 @@
-"""Request and response schemas for goals and tasks."""
+"""Request and response schemas for goals, tasks and postponements."""
 
 import uuid
 from datetime import date, datetime
@@ -6,7 +6,12 @@ from typing import Annotated, Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-from task_master.models import GoalStatus, TaskStatus
+from task_master.models import (
+    POSTPONE_NOTE_MAX_LENGTH,
+    GoalStatus,
+    PostponeReason,
+    TaskStatus,
+)
 
 Title = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
@@ -115,3 +120,57 @@ class TaskRead(BaseModel):
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+PostponeNote = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=POSTPONE_NOTE_MAX_LENGTH)
+]
+
+
+class PostponeRequest(BaseModel):
+    """Move a task to a later date, saying why."""
+
+    to_date: date
+    reason: PostponeReason
+    note: PostponeNote | None = None
+
+    @model_validator(mode="after")
+    def require_note_for_other(self) -> Self:
+        """Blank notes count as none; `other` must explain itself."""
+        if self.note == "":
+            self.note = None
+        if self.reason is PostponeReason.OTHER and self.note is None:
+            raise ValueError("A note is required when the reason is 'other'")
+        return self
+
+
+class PostponementRead(BaseModel):
+    """One recorded postponement."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    task_id: uuid.UUID
+    from_date: date | None
+    to_date: date
+    reason: PostponeReason
+    note: str | None
+    created_at: datetime
+
+
+class SuggestionRead(BaseModel):
+    """The fix suggested for a postponement."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    headline: str
+    actions: list[str]
+    reflection: str | None
+
+
+class PostponeResponse(BaseModel):
+    """The updated task, what was recorded, and how to stop postponing."""
+
+    task: TaskRead
+    postponement: PostponementRead
+    suggestion: SuggestionRead

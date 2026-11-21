@@ -302,6 +302,46 @@ export interface paths {
         patch: operations["handle_update_task_tasks__task_id__patch"];
         trace?: never;
     };
+    "/tasks/{task_id}/postpone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Postpone Task
+         * @description Move an open task to a later date and get a fix for the reason given.
+         */
+        post: operations["handle_postpone_task_tasks__task_id__postpone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/postponements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle List Postponements
+         * @description A task's postponement history, oldest first.
+         */
+        get: operations["handle_list_postponements_tasks__task_id__postponements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -453,12 +493,84 @@ export interface components {
             status: "ok";
         };
         /**
+         * PostponeReason
+         * @description Root cause of a postponement; each one calls for a different fix.
+         * @enum {string}
+         */
+        PostponeReason: "stuck" | "dreading" | "blocked" | "other";
+        /**
+         * PostponeRequest
+         * @description Move a task to a later date, saying why.
+         */
+        PostponeRequest: {
+            /**
+             * To Date
+             * Format: date
+             */
+            to_date: string;
+            reason: components["schemas"]["PostponeReason"];
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * PostponeResponse
+         * @description The updated task, what was recorded, and how to stop postponing.
+         */
+        PostponeResponse: {
+            task: components["schemas"]["TaskRead"];
+            postponement: components["schemas"]["PostponementRead"];
+            suggestion: components["schemas"]["SuggestionRead"];
+        };
+        /**
+         * PostponementRead
+         * @description One recorded postponement.
+         */
+        PostponementRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** From Date */
+            from_date: string | null;
+            /**
+             * To Date
+             * Format: date
+             */
+            to_date: string;
+            reason: components["schemas"]["PostponeReason"];
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
          * RefreshRequest
          * @description Refresh token sent by mobile clients.
          */
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * SuggestionRead
+         * @description The fix suggested for a postponement.
+         */
+        SuggestionRead: {
+            /** Headline */
+            headline: string;
+            /** Actions */
+            actions: string[];
+            /** Reflection */
+            reflection: string | null;
         };
         /**
          * TaskCreate
@@ -1479,6 +1591,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_postpone_task_tasks__task_id__postpone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostponeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostponeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_list_postponements_tasks__task_id__postponements_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostponementRead"][];
                 };
             };
             /** @description Validation Error */

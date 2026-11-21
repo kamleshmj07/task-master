@@ -1218,6 +1218,141 @@
           }
         }
       }
+    },
+    "/tasks/{task_id}/postpone": {
+      "post": {
+        "tags": [
+          "postponements"
+        ],
+        "summary": "Handle Postpone Task",
+        "description": "Move an open task to a later date and get a fix for the reason given.",
+        "operationId": "handle_postpone_task_tasks__task_id__postpone_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostponeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostponeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/postponements": {
+      "get": {
+        "tags": [
+          "postponements"
+        ],
+        "summary": "Handle List Postponements",
+        "description": "A task's postponement history, oldest first.",
+        "operationId": "handle_list_postponements_tasks__task_id__postponements_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostponementRead"
+                  },
+                  "title": "Response Handle List Postponements Tasks  Task Id  Postponements Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1581,6 +1716,131 @@
         "title": "HealthResponse",
         "description": "Health check payload."
       },
+      "PostponeReason": {
+        "type": "string",
+        "enum": [
+          "stuck",
+          "dreading",
+          "blocked",
+          "other"
+        ],
+        "title": "PostponeReason",
+        "description": "Root cause of a postponement; each one calls for a different fix."
+      },
+      "PostponeRequest": {
+        "properties": {
+          "to_date": {
+            "type": "string",
+            "format": "date",
+            "title": "To Date"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PostponeReason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 280
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to_date",
+          "reason"
+        ],
+        "title": "PostponeRequest",
+        "description": "Move a task to a later date, saying why."
+      },
+      "PostponeResponse": {
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskRead"
+          },
+          "postponement": {
+            "$ref": "#/components/schemas/PostponementRead"
+          },
+          "suggestion": {
+            "$ref": "#/components/schemas/SuggestionRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task",
+          "postponement",
+          "suggestion"
+        ],
+        "title": "PostponeResponse",
+        "description": "The updated task, what was recorded, and how to stop postponing."
+      },
+      "PostponementRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "from_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Date"
+          },
+          "to_date": {
+            "type": "string",
+            "format": "date",
+            "title": "To Date"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PostponeReason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_id",
+          "from_date",
+          "to_date",
+          "reason",
+          "note",
+          "created_at"
+        ],
+        "title": "PostponementRead",
+        "description": "One recorded postponement."
+      },
       "RefreshRequest": {
         "properties": {
           "refresh_token": {
@@ -1596,6 +1856,40 @@
         ],
         "title": "RefreshRequest",
         "description": "Refresh token sent by mobile clients."
+      },
+      "SuggestionRead": {
+        "properties": {
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "reflection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reflection"
+          }
+        },
+        "type": "object",
+        "required": [
+          "headline",
+          "actions",
+          "reflection"
+        ],
+        "title": "SuggestionRead",
+        "description": "The fix suggested for a postponement."
       },
       "TaskCreate": {
         "properties": {
