@@ -17,3 +17,11 @@ wheels/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Node
+node_modules/
+dist/
+.expo/
+coverage/
+playwright-report/
+test-results/

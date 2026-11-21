@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      db:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: task_master
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: task_master_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U task_master -d task_master_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TASK_MASTER_DATABASE_URL: postgresql+asyncpg://task_master:ci-only-password@localhost:5432/task_master_test
+      TASK_MASTER_TEST_DATABASE_URL: postgresql+asyncpg://task_master:ci-only-password@localhost:5432/task_master_test
+      TASK_MASTER_AUTH_SECRET: ci-only-auth-secret
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Type check
+        run: uv run pyright
+      - name: Lint
+        run: uv run ruff check .
+      - name: Test
+        run: uv run pytest --cov-fail-under=85
+      - name: Audit dependencies
+        run: |
+          uv export --frozen --no-emit-project --format requirements-txt > "$RUNNER_TEMP/requirements.txt"
+          uvx pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/requirements.txt"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  api-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: uv sync --locked
+        working-directory: backend
+      - run: npm ci
+      - name: Regenerate API client types
+        run: npm run generate:api
+      - name: Fail if generated files are stale
+        run: git diff --exit-code -- packages/api-client
