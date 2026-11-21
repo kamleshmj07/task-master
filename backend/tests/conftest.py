@@ -116,3 +116,25 @@ async def api_client(
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="https://test") as client:
         yield client
+
+
+async def login_headers(client: AsyncClient, email: str) -> dict[str, str]:
+    """Register `email`, log in on mobile, and return bearer auth headers."""
+    password = "correct-horse-battery"
+    await client.post("/auth/register", json={"email": email, "password": password})
+    response = await client.post(
+        "/auth/mobile/login", data={"username": email, "password": password}
+    )
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture
+async def auth_headers(api_client: AsyncClient) -> dict[str, str]:
+    """Bearer headers for a freshly registered user."""
+    return await login_headers(api_client, "owner@example.com")
+
+
+@pytest.fixture
+async def other_headers(api_client: AsyncClient) -> dict[str, str]:
+    """Bearer headers for a second, unrelated user."""
+    return await login_headers(api_client, "stranger@example.com")

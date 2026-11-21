@@ -198,6 +198,110 @@ export interface paths {
         patch: operations["users_patch_user_users__id__patch"];
         trace?: never;
     };
+    "/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle List Goals
+         * @description List goals, oldest first, optionally filtered by status.
+         */
+        get: operations["handle_list_goals_goals_get"];
+        put?: never;
+        /**
+         * Handle Create Goal
+         * @description Create a goal.
+         */
+        post: operations["handle_create_goal_goals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goals/{goal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Get Goal
+         * @description Return one goal.
+         */
+        get: operations["handle_get_goal_goals__goal_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Handle Delete Goal
+         * @description Delete a goal and, by cascade, its tasks.
+         */
+        delete: operations["handle_delete_goal_goals__goal_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Handle Update Goal
+         * @description Change any of a goal's fields.
+         */
+        patch: operations["handle_update_goal_goals__goal_id__patch"];
+        trace?: never;
+    };
+    "/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle List Tasks
+         * @description List tasks, soonest due first (undated last), with optional filters.
+         */
+        get: operations["handle_list_tasks_tasks_get"];
+        put?: never;
+        /**
+         * Handle Create Task
+         * @description Create a task under one of the user's goals.
+         */
+        post: operations["handle_create_task_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Get Task
+         * @description Return one task.
+         */
+        get: operations["handle_get_task_tasks__task_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Handle Delete Task
+         * @description Delete a task.
+         */
+        delete: operations["handle_delete_task_tasks__task_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Handle Update Task
+         * @description Change a task; moving it requires owning the destination goal.
+         */
+        patch: operations["handle_update_task_tasks__task_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -273,6 +377,65 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /**
+         * GoalCreate
+         * @description New goal.
+         */
+        GoalCreate: {
+            /** Title */
+            title: string;
+            /** Why */
+            why?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+        };
+        /**
+         * GoalRead
+         * @description A goal as returned by the API.
+         */
+        GoalRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Why */
+            why: string | null;
+            /** Deadline */
+            deadline: string | null;
+            status: components["schemas"]["GoalStatus"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * GoalStatus
+         * @description Lifecycle of a goal.
+         * @enum {string}
+         */
+        GoalStatus: "active" | "completed" | "archived";
+        /**
+         * GoalUpdate
+         * @description Partial goal update.
+         */
+        GoalUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Why */
+            why?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            status?: components["schemas"]["GoalStatus"] | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -296,6 +459,87 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * TaskCreate
+         * @description New task; every task needs a goal and a concrete next action.
+         */
+        TaskCreate: {
+            /**
+             * Goal Id
+             * Format: uuid
+             */
+            goal_id: string;
+            /** Title */
+            title: string;
+            /** Next Action */
+            next_action: string;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+            /** Due Date */
+            due_date?: string | null;
+        };
+        /**
+         * TaskRead
+         * @description A task as returned by the API.
+         */
+        TaskRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Goal Id
+             * Format: uuid
+             */
+            goal_id: string;
+            /** Title */
+            title: string;
+            /** Next Action */
+            next_action: string;
+            /** Estimate Minutes */
+            estimate_minutes: number | null;
+            /** Due Date */
+            due_date: string | null;
+            status: components["schemas"]["TaskStatus"];
+            /** Postpone Count */
+            postpone_count: number;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * TaskStatus
+         * @description Lifecycle of a task.
+         * @enum {string}
+         */
+        TaskStatus: "todo" | "done";
+        /**
+         * TaskUpdate
+         * @description Partial task update. Setting `status` maintains `completed_at`.
+         */
+        TaskUpdate: {
+            /** Goal Id */
+            goal_id?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Next Action */
+            next_action?: string | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+            /** Due Date */
+            due_date?: string | null;
+            status?: components["schemas"]["TaskStatus"] | null;
         };
         /**
          * TokenPairResponse
@@ -913,6 +1157,329 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_list_goals_goals_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["GoalStatus"] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_create_goal_goals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_get_goal_goals__goal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_delete_goal_goals__goal_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_update_goal_goals__goal_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoalUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_list_tasks_tasks_get: {
+        parameters: {
+            query?: {
+                goal_id?: string | null;
+                status?: components["schemas"]["TaskStatus"] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_create_task_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_get_task_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_delete_task_tasks__task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_update_task_tasks__task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
             };
             /** @description Validation Error */
             422: {
