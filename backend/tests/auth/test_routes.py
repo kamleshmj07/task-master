@@ -145,7 +145,23 @@ class TestWebLogin:
 
         assert response.status_code == 400
 
-    async def test_rate_limits_repeated_attempts(self, api_client: AsyncClient) -> None:
+    async def test_locks_account_after_five_failures(
+        self, api_client: AsyncClient
+    ) -> None:
+        await _register(api_client)
+        for _ in range(5):
+            await _login(api_client, "web", password="wrong-password-123")
+
+        response = await _login(api_client, "web")
+
+        assert (response.status_code, response.headers["retry-after"]) == (
+            429,
+            "60",
+        )
+
+    async def test_unknown_email_locks_the_same_way(
+        self, api_client: AsyncClient
+    ) -> None:
         for _ in range(5):
             await _login(api_client, "web")
 
@@ -155,6 +171,37 @@ class TestWebLogin:
             429,
             "60",
         )
+
+    async def test_successful_logins_are_not_throttled(
+        self, api_client: AsyncClient
+    ) -> None:
+        await _register(api_client)
+
+        statuses = [(await _login(api_client, "web")).status_code for _ in range(8)]
+
+        assert statuses == [200] * 8
+
+    async def test_success_resets_the_failure_count(
+        self, api_client: AsyncClient
+    ) -> None:
+        await _register(api_client)
+        for _ in range(4):
+            await _login(api_client, "web", password="wrong-password-123")
+        await _login(api_client, "web")
+
+        await _login(api_client, "web", password="wrong-password-123")
+        response = await _login(api_client, "web")
+
+        assert response.status_code == 200
+
+    async def test_lockout_spans_web_and_mobile(self, api_client: AsyncClient) -> None:
+        await _register(api_client)
+        for _ in range(5):
+            await _login(api_client, "web", password="wrong-password-123")
+
+        response = await _login(api_client, "mobile")
+
+        assert response.status_code == 429
 
 
 class TestWebRefresh:

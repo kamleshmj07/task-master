@@ -51,9 +51,24 @@ family, and changing the password logs the user out everywhere.
 | `POST /auth/mobile/logout` | Revoke both tokens |
 | `GET/PATCH /users/me` | Read or update the current account |
 
-Register, login and refresh are rate limited per client IP
-(`TASK_MASTER_AUTH_RATE_LIMIT`, default `5/minute`). Counters are in memory,
-so they are per worker; move them to Redis before scaling out.
+Failed logins are throttled; successful ones never are:
+
+- **Per account**: the first 4 failures are free. The 5th locks the account
+  for 1 minute, and each further failure doubles the lock (2, 4, 8, up to
+  15 minutes). A successful login clears the count, and so do 15 quiet
+  minutes. While locked, the password is not even checked.
+- **Per IP**: 20 failures in 15 minutes, across all accounts, block that IP.
+
+Both answer `429` with `Retry-After`, and unknown emails are throttled
+exactly like real ones, so the lockout never reveals which accounts exist.
+Locks are always temporary, so nobody can lock a real user out for good.
+Tune with the `TASK_MASTER_LOGIN_*` settings in `config.py`.
+
+Register and refresh keep a simple per-IP limit
+(`TASK_MASTER_AUTH_RATE_LIMIT`, default `5/minute`).
+
+All counters live in memory, so they are per worker and reset on restart;
+move them to Redis before scaling out.
 
 The web refresh cookie is `SameSite=Strict`, so in production the web app and
 the API must share a registrable domain (e.g. `app.example.com` and

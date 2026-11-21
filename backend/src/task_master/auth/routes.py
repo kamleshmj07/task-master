@@ -13,11 +13,20 @@ import uuid
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.exceptions import InvalidID, UserNotExists
 from fastapi_users.router.common import ErrorCode
 
+from task_master.auth.lockout import LoginThrottle
 from task_master.auth.rate_limit import enforce_auth_rate_limit
 from task_master.auth.schemas import (
     AccessTokenResponse,
@@ -61,15 +70,33 @@ def _invalid_refresh_token() -> HTTPException:
     )
 
 
-async def _authenticate(credentials: CredentialsDep, users: UserManagerDep) -> User:
-    """Return the active user matching the credentials, else 400."""
+async def _authenticate(
+    request: Request, credentials: CredentialsDep, users: UserManagerDep
+) -> User:
+    """Return the active user matching the credentials.
+
+    Raises 429 while the account or client IP is locked out (without checking
+    the password) and 400 for bad credentials, counting the failure.
+    """
+    throttle: LoginThrottle = request.app.state.login_throttle
+    ip = request.client.host if request.client else "unknown"
+    email = credentials.username
+    wait = throttle.retry_after(ip, email)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed logins; try again later",
+            headers={"Retry-After": str(wait)},
+        )
     user = await users.authenticate(credentials)
     if user is None or not user.is_active:
+        throttle.record_failure(ip, email)
         logger.warning("Failed login attempt")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
         )
+    throttle.record_success(email)
     return user
 
 
@@ -126,7 +153,7 @@ async def _new_refresh_token(
     return await issue_refresh_token(session, user_id, _refresh_lifetime(settings))
 
 
-@web_router.post("/login", dependencies=[RateLimitDep])
+@web_router.post("/login")
 async def handle_web_login(
     response: Response,
     user: Annotated[User, Depends(_authenticate)],
@@ -176,7 +203,7 @@ async def handle_web_logout(
     )
 
 
-@mobile_router.post("/login", dependencies=[RateLimitDep])
+@mobile_router.post("/login")
 async def handle_mobile_login(
     user: Annotated[User, Depends(_authenticate)],
     strategy: StrategyDep,

@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from task_master.auth import routes as auth_routes
+from task_master.auth.lockout import LockoutPolicy, LoginThrottle
 from task_master.auth.rate_limit import RateLimiter, enforce_auth_rate_limit
 from task_master.auth.schemas import UserCreate, UserRead, UserUpdate
 from task_master.auth.users import fastapi_users
@@ -35,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.session_factory = create_session_factory(engine)
     app.state.auth_rate_limiter = RateLimiter(settings.auth_rate_limit)
+    app.state.login_throttle = LoginThrottle(_lockout_policy(settings))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -44,6 +46,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     _include_routers(app)
     return app
+
+
+def _lockout_policy(settings: Settings) -> LockoutPolicy:
+    """Translate login lockout settings into a throttle policy."""
+    return LockoutPolicy(
+        free_failures=settings.login_free_failures,
+        base_lock_seconds=settings.login_base_lock_seconds,
+        max_lock_seconds=settings.login_max_lock_seconds,
+        ip_failures=settings.login_ip_failures,
+        ip_window_seconds=settings.login_ip_window_seconds,
+    )
 
 
 def _include_routers(app: FastAPI) -> None:
