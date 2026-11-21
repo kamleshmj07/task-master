@@ -31,7 +31,8 @@ def main(argv: list[str]) -> int:
         print("usage: python -m task_master.openapi <output.json>", file=sys.stderr)
         return 2
     output = Path(argv[0])
-    output.write_text(json.dumps(build_schema(), indent=2) + "\n", encoding="utf-8")
+    schema = json.dumps(build_schema(), indent=2) + "\n"
+    output.write_text(schema, encoding="utf-8", newline="\n")
     return 0
 
 

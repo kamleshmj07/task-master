@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.models import (
@@ -139,6 +139,18 @@ class TestTask:
         assert (await db_session.scalars(select(Task))).all() == []
 
 
+def _postponement(
+    task: Task, reason: PostponeReason, note: str | None = None
+) -> TaskPostponement:
+    return TaskPostponement(
+        task_id=task.id,
+        from_date=TODAY,
+        to_date=date(2026, 11, 20),
+        reason=reason,
+        note=note,
+    )
+
+
 class TestTaskPostponement:
     async def test_stores_reason(self, db_session: AsyncSession) -> None:
         task = await make_task(
@@ -148,14 +160,14 @@ class TestTaskPostponement:
             task_id=task.id,
             from_date=TODAY,
             to_date=date(2026, 11, 20),
-            reason=PostponeReason.TOO_BIG,
+            reason=PostponeReason.STUCK,
         )
         db_session.add(postponement)
         await db_session.flush()
 
         stored = await db_session.scalar(select(TaskPostponement.reason))
 
-        assert stored is PostponeReason.TOO_BIG
+        assert stored is PostponeReason.STUCK
 
     async def test_rejects_moving_backwards(self, db_session: AsyncSession) -> None:
         task = await make_task(
@@ -168,9 +180,72 @@ class TestTaskPostponement:
                 task_id=task.id,
                 from_date=TODAY,
                 to_date=TODAY,
-                reason=PostponeReason.NO_TIME,
+                reason=PostponeReason.BLOCKED,
             ),
         )
+
+    async def test_rejects_other_without_note(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+
+        await assert_rejected(db_session, _postponement(task, PostponeReason.OTHER))
+
+    async def test_rejects_other_with_blank_note(
+        self, db_session: AsyncSession
+    ) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+
+        await assert_rejected(
+            db_session, _postponement(task, PostponeReason.OTHER, note="   ")
+        )
+
+    async def test_stores_other_with_note(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        db_session.add(_postponement(task, PostponeReason.OTHER, note="Sick day"))
+        await db_session.flush()
+
+        stored = await db_session.scalar(select(TaskPostponement.note))
+
+        assert stored == "Sick day"
+
+    async def test_allows_note_with_any_reason(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        db_session.add(
+            _postponement(task, PostponeReason.BLOCKED, note="Waiting on Sam")
+        )
+        await db_session.flush()
+
+        stored = await db_session.scalar(select(TaskPostponement.note))
+
+        assert stored == "Waiting on Sam"
+
+    async def test_rejects_note_over_280_chars(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        db_session.add(_postponement(task, PostponeReason.OTHER, note="x" * 281))
+
+        with pytest.raises(DBAPIError):
+            await db_session.flush()
+
+    async def test_rejects_retired_reason(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        insert = text(
+            "INSERT INTO task_postponement (id, task_id, to_date, reason) "
+            "VALUES (gen_random_uuid(), :task_id, :to_date, 'too_big')"
+        )
+
+        with pytest.raises(IntegrityError):
+            await db_session.execute(insert, {"task_id": task.id, "to_date": TODAY})
 
 
 class TestDailyPlan:

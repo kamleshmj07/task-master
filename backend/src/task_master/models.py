@@ -46,18 +46,19 @@ class TaskStatus(StrEnum):
 
 
 class PostponeReason(StrEnum):
-    """Why a task was postponed; drives the suggested fix."""
+    """Root cause of a postponement; each one calls for a different fix."""
 
-    UNCLEAR = "unclear"
-    TOO_BIG = "too_big"
-    BORING = "boring"
-    ANXIOUS = "anxious"
-    BLOCKED = "blocked"
-    NO_TIME = "no_time"
+    STUCK = "stuck"  # "I don't know where to start"
+    DREADING = "dreading"  # "I don't want to do it"
+    BLOCKED = "blocked"  # "Something's in the way"
+    OTHER = "other"  # Free text in `note`
+
+
+POSTPONE_NOTE_MAX_LENGTH = 280
 
 
 def _enum_values(enum_cls: type[StrEnum]) -> list[str]:
-    """Persist enum values (e.g. "too_big"), not member names."""
+    """Persist enum values (e.g. "stuck"), not member names."""
     return [member.value for member in enum_cls]
 
 
@@ -219,6 +220,10 @@ class TaskPostponement(Base):
         CheckConstraint(
             "from_date IS NULL OR to_date > from_date", name="moves_forward"
         ),
+        CheckConstraint(
+            "reason <> 'other' OR length(trim(coalesce(note, ''))) > 0",
+            name="other_has_note",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -228,6 +233,7 @@ class TaskPostponement(Base):
     from_date: Mapped[date | None] = mapped_column(Date)
     to_date: Mapped[date] = mapped_column(Date)
     reason: Mapped[PostponeReason] = mapped_column(_enum_column(PostponeReason))
+    note: Mapped[str | None] = mapped_column(String(POSTPONE_NOTE_MAX_LENGTH))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

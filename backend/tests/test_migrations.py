@@ -1,6 +1,7 @@
 """Migration tests: schema shape, model parity, and reversibility."""
 
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 import anyio
@@ -9,7 +10,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import Connection, inspect
+from sqlalchemy import Connection, inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from task_master.models import Base
@@ -43,6 +44,70 @@ def _table_names(connection: Connection) -> set[str]:
     return set(inspect(connection).get_table_names())
 
 
+BEFORE_REASONS = "af280e9918d3"
+OLD_TO_NEW_REASON = {
+    "unclear": "stuck",
+    "too_big": "stuck",
+    "boring": "dreading",
+    "anxious": "dreading",
+    "blocked": "blocked",
+    "no_time": "blocked",
+}
+SEED_USER_ID = "00000000-0000-4000-8000-000000000001"
+
+
+def _seed_task(connection: Connection) -> None:
+    """Insert one user, goal and task with raw SQL valid at any revision."""
+    statements = [
+        'INSERT INTO "user" (id, email, hashed_password, is_active,'
+        " is_superuser, is_verified, timezone, daily_capacity_minutes)"
+        " VALUES (:user, 'seed@example.com', 'x', true, false, false, 'UTC', 480)",
+        "INSERT INTO goal (id, user_id, title, status)"
+        " VALUES (:goal, :user, 'Seed goal', 'active')",
+        "INSERT INTO task (id, user_id, goal_id, title, next_action, status,"
+        " postpone_count) VALUES (:task, :user, :goal, 'Seed', 'Start', 'todo', 0)",
+    ]
+    ids = {
+        "user": SEED_USER_ID,
+        "goal": "00000000-0000-4000-8000-000000000002",
+        "task": "00000000-0000-4000-8000-000000000003",
+    }
+    for statement in statements:
+        connection.execute(text(statement), ids)
+
+
+def _seed_postponements(reasons: list[str]) -> Callable[[Connection], None]:
+    def seed(connection: Connection) -> None:
+        _seed_task(connection)
+        for index, reason in enumerate(reasons, start=1):
+            connection.execute(
+                text(
+                    "INSERT INTO task_postponement (id, task_id, to_date, reason)"
+                    " VALUES (gen_random_uuid(), :task, :to_date, :reason)"
+                ),
+                {
+                    "task": "00000000-0000-4000-8000-000000000003",
+                    "to_date": date(2026, 12, index),
+                    "reason": reason,
+                },
+            )
+        connection.commit()
+
+    return seed
+
+
+def _reasons_by_date(connection: Connection) -> list[str]:
+    rows = connection.execute(
+        text("SELECT reason FROM task_postponement ORDER BY to_date")
+    )
+    return list(rows.scalars())
+
+
+def _delete_seed(connection: Connection) -> None:
+    connection.execute(text('DELETE FROM "user" WHERE id = :id'), {"id": SEED_USER_ID})
+    connection.commit()
+
+
 def _model_diff(connection: Connection) -> list[Any]:
     return compare_metadata(MigrationContext.configure(connection), Base.metadata)
 
@@ -68,3 +133,33 @@ class TestMigrations:
             command.upgrade(alembic_config, "head")
 
         assert tables == {"alembic_version"}
+
+
+class TestSimplifyPostponeReasons:
+    def test_upgrade_maps_old_reasons_to_root_causes(
+        self, migrated_db: str, alembic_config: Config
+    ) -> None:
+        command.downgrade(alembic_config, BEFORE_REASONS)
+        try:
+            _run_on_db(migrated_db, _seed_postponements(list(OLD_TO_NEW_REASON)))
+            command.upgrade(alembic_config, "head")
+            reasons = _run_on_db(migrated_db, _reasons_by_date)
+        finally:
+            _run_on_db(migrated_db, _delete_seed)
+            command.upgrade(alembic_config, "head")
+
+        assert reasons == list(OLD_TO_NEW_REASON.values())
+
+    def test_downgrade_maps_new_reasons_back(
+        self, migrated_db: str, alembic_config: Config
+    ) -> None:
+        new_reasons = ["stuck", "dreading", "blocked"]
+        try:
+            _run_on_db(migrated_db, _seed_postponements(new_reasons))
+            command.downgrade(alembic_config, BEFORE_REASONS)
+            reasons = _run_on_db(migrated_db, _reasons_by_date)
+        finally:
+            _run_on_db(migrated_db, _delete_seed)
+            command.upgrade(alembic_config, "head")
+
+        assert reasons == ["unclear", "boring", "blocked"]
