@@ -15,6 +15,54 @@ uv run alembic upgrade head
 uv run uvicorn task_master.main:create_app --factory --reload
 ```
 
+## Code layout
+
+| Path | What |
+| --- | --- |
+| `src/task_master/main.py` | App factory: middleware and routers |
+| `src/task_master/config.py` | Settings from `TASK_MASTER_*` env vars or `.env` |
+| `src/task_master/models.py` | SQLAlchemy models |
+| `src/task_master/schemas.py` | Request and response schemas |
+| `src/task_master/routes/` | One module per resource |
+| `src/task_master/auth/` | Accounts, tokens, login throttling |
+| `src/task_master/postponement.py` | The fix suggested for each postpone reason |
+| `src/task_master/routines.py` | When routines are due, and streaks |
+| `src/task_master/cleanup.py` | Deletes finished tasks past retention |
+| `src/task_master/openapi.py` | Writes the OpenAPI schema for client generation |
+| `migrations/` | Alembic migrations |
+| `tests/` | pytest suite, mirroring `src/`; `tests/seed/` holds test-data scripts |
+
+## API
+
+Every route below needs a signed-in user and only ever touches that user's
+data: another user's goal, task or routine is reported as `404`. Lists take
+`limit` (max 100, default 50) and `offset`. Full, interactive docs are at
+`/docs` outside production.
+
+| Route | Purpose |
+| --- | --- |
+| `GET/POST /goals`, `GET/PATCH/DELETE /goals/{id}` | Goals; deleting one deletes its tasks |
+| `GET/POST /tasks`, `GET/PATCH/DELETE /tasks/{id}` | Tasks; filter by `view`, `status`, `someday`, `goal_id`, `no_goal` |
+| `GET /tasks/counts` | Totals per view (Scheduled, Review, Someday, Done) for the same goal filters |
+| `POST /tasks/{id}/steps`, `PATCH/DELETE /tasks/{id}/steps/{step_id}` | Add, rename, tick or remove steps; a task keeps at least one |
+| `PUT /tasks/{id}/steps/order` | Reorder all of a task's steps |
+| `POST /tasks/{id}/postpone` | Move a task later or to Someday with a reason; returns the suggested fix |
+| `GET /tasks/{id}/postponements` | A task's postponement history |
+| `GET/POST /routines`, `GET/PATCH/DELETE /routines/{id}` | Routines |
+| `GET /routines/due?on=` | Routines due on a day, with done flag and streak |
+| `PUT/DELETE /routines/{id}/completions/{day}` | Tick a routine off for a day, or undo it |
+| `GET/PUT /plans/{date}` | A day's Top 3 tasks, shown beside its routines |
+| `GET /notifications`, `GET /notifications/unread-count` | Saved postpone tips, newest first |
+| `POST /notifications/{id}/read`, `POST /notifications/read-all` | Mark tips as read |
+| `DELETE /users/me` | Delete the account and all its data; needs the current password |
+
+Each open task is in exactly one view: **Review** if every step is done or
+its due date has passed, otherwise **Scheduled** (dated) or **Someday**
+(undated). Postponing a task also saves its suggested fix as a notification.
+
+A task's due date can be brought forward with `PATCH`, but moving it later or
+clearing it must go through `/postpone`, so every deferral is recorded.
+
 ## Checks
 
 ```bash
@@ -49,7 +97,7 @@ family, and changing the password logs the user out everywhere.
 | `POST /auth/mobile/login` | Log in; both tokens returned in the body |
 | `POST /auth/mobile/refresh` | Swap a refresh token for a new pair |
 | `POST /auth/mobile/logout` | Revoke both tokens |
-| `GET/PATCH /users/me` | Read or update the current account |
+| `GET/PATCH /users/me` | Read or update the current account (display name, timezone) |
 
 Failed logins are throttled; successful ones never are:
 
