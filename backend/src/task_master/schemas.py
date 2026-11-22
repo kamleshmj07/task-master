@@ -4,7 +4,14 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, ClassVar, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    computed_field,
+    model_validator,
+)
 
 from task_master.models import (
     POSTPONE_NOTE_MAX_LENGTH,
@@ -12,16 +19,18 @@ from task_master.models import (
     PostponeReason,
     RoutineFrequency,
     TaskStatus,
+    TaskStep,
 )
 
 Title = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
 ]
-NextAction = Annotated[
+StepText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
 ]
 Why = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
-EstimateMinutes = Annotated[int, Field(ge=1, le=1440)]
+TimeLimitMinutes = Annotated[int, Field(ge=1, le=1440)]
+MAX_STEPS = 50
 
 
 class PatchModel(BaseModel):
@@ -83,47 +92,91 @@ class GoalRead(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    """New task; it needs a concrete next action and may serve a goal.
+    """New task: its steps, in order, starting with a concrete first one.
 
     Leaving out `due_date` puts the task in Someday.
     """
 
     goal_id: uuid.UUID | None = None
     title: Title
-    next_action: NextAction
-    estimate_minutes: EstimateMinutes | None = None
+    steps: list[StepText] = Field(min_length=1, max_length=MAX_STEPS)
+    time_limit_minutes: TimeLimitMinutes | None = None
     due_date: date | None = None
 
 
 class TaskUpdate(PatchModel):
-    """Partial task update. Setting `status` maintains `completed_at`."""
+    """Partial task update. Setting `status` maintains `completed_at`.
 
-    REQUIRED_IF_SET = frozenset({"title", "next_action", "status"})
+    Steps change through the task's `/steps` routes.
+    """
+
+    REQUIRED_IF_SET = frozenset({"title", "status"})
 
     goal_id: uuid.UUID | None = None
     title: Title | None = None
-    next_action: NextAction | None = None
-    estimate_minutes: EstimateMinutes | None = None
+    time_limit_minutes: TimeLimitMinutes | None = None
     due_date: date | None = None
     status: TaskStatus | None = None
 
 
+class StepCreate(BaseModel):
+    """A step added to the end of a task."""
+
+    text: StepText
+
+
+class StepUpdate(PatchModel):
+    """Rename a step, or tick it off (`done: true`) or back (`done: false`)."""
+
+    REQUIRED_IF_SET = frozenset({"text", "done"})
+
+    text: StepText | None = None
+    done: bool | None = None
+
+
+class StepRead(BaseModel):
+    """One step of a task."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    text: str
+    done: bool
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_done(cls, data: Any) -> Any:
+        """A stored step is done when it has a `done_at` time."""
+        if isinstance(data, TaskStep):
+            return {"id": data.id, "text": data.text, "done": data.done_at is not None}
+        return data
+
+
 class TaskRead(BaseModel):
-    """A task as returned by the API."""
+    """A task as returned by the API, with its steps in order.
+
+    `next_step` is the first unfinished step: the task's next action.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     goal_id: uuid.UUID | None
     title: str
-    next_action: str
-    estimate_minutes: int | None
+    steps: list[StepRead]
+    time_limit_minutes: int | None
     due_date: date | None
     status: TaskStatus
     postpone_count: int
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def next_step(self) -> str | None:
+        """Text of the first step not yet done, if any."""
+        return next((step.text for step in self.steps if not step.done), None)
 
 
 PostponeNote = Annotated[
@@ -221,7 +274,6 @@ class RoutineCreate(RoutineSchedule):
 
     title: Title
     goal_id: uuid.UUID | None = None
-    estimate_minutes: EstimateMinutes | None = None
 
 
 class RoutineUpdate(PatchModel):
@@ -231,7 +283,6 @@ class RoutineUpdate(PatchModel):
 
     title: Title | None = None
     goal_id: uuid.UUID | None = None
-    estimate_minutes: EstimateMinutes | None = None
     frequency: RoutineFrequency | None = None
     weekdays: list[Weekday] | None = None
     day_of_month: DayOfMonth | None = None
@@ -247,7 +298,6 @@ class RoutineRead(BaseModel):
     id: uuid.UUID
     goal_id: uuid.UUID | None
     title: str
-    estimate_minutes: int | None
     frequency: RoutineFrequency
     weekdays: list[int] | None
     day_of_month: int | None
@@ -285,18 +335,9 @@ class PlanItem(BaseModel):
     task: TaskRead
 
 
-class Capacity(BaseModel):
-    """Planned minutes against the user's daily capacity."""
-
-    limit_minutes: int
-    planned_minutes: int
-    over: bool
-
-
 class PlanRead(BaseModel):
     """A day: its Top 3 tasks and, separately, its routines."""
 
     plan_date: date
     top_three: list[PlanItem]
     routines: list[DueRoutine]
-    capacity: Capacity

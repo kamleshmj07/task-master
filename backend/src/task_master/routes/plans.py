@@ -16,7 +16,6 @@ from task_master.models import (
 )
 from task_master.routines import load_due_routines
 from task_master.schemas import (
-    Capacity,
     DueRoutine,
     PlanItem,
     PlanRead,
@@ -32,7 +31,7 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 async def handle_get_plan(
     plan_date: date, user: CurrentUserDep, session: SessionDep, now: NowDep
 ) -> PlanRead:
-    """The day's Top 3 and routines, with planned minutes against capacity."""
+    """The day's Top 3 tasks and, separately, its routines."""
     today = local_today(user.timezone, now)
     return await _read_plan(session, user, plan_date, today)
 
@@ -75,7 +74,7 @@ async def handle_set_plan(
 async def _read_plan(
     session: SessionDep, user: User, plan_date: date, today: date
 ) -> PlanRead:
-    """Assemble the Top 3, the due routines and the capacity check."""
+    """Assemble the Top 3 and the due routines."""
     rows = await session.execute(
         select(DailyPlanItem.rank, Task)
         .join(DailyPlan, DailyPlan.id == DailyPlanItem.plan_id)
@@ -92,18 +91,7 @@ async def _read_plan(
             session, user.id, plan_date, today
         )
     ]
-    planned = sum(item.task.estimate_minutes or 0 for item in top_three) + sum(
-        due.routine.estimate_minutes or 0 for due in routines
-    )
-    limit = user.daily_capacity_minutes
-    return PlanRead(
-        plan_date=plan_date,
-        top_three=top_three,
-        routines=routines,
-        capacity=Capacity(
-            limit_minutes=limit, planned_minutes=planned, over=planned > limit
-        ),
-    )
+    return PlanRead(plan_date=plan_date, top_three=top_three, routines=routines)
 
 
 async def _get_or_create_plan(

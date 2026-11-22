@@ -71,7 +71,6 @@ class TestRegister:
             "is_superuser",
             "is_verified",
             "timezone",
-            "daily_capacity_minutes",
         }
 
     async def test_ignores_superuser_flag(self, api_client: AsyncClient) -> None:
@@ -359,16 +358,16 @@ class TestCurrentUser:
 
         assert response.json()["email"] == EMAIL
 
-    async def test_updates_daily_capacity(self, api_client: AsyncClient) -> None:
+    async def test_updates_timezone(self, api_client: AsyncClient) -> None:
         access_token, _ = await _mobile_session(api_client)
 
         response = await api_client.patch(
             "/users/me",
-            json={"daily_capacity_minutes": 240},
+            json={"timezone": "Europe/London"},
             headers=_bearer(access_token),
         )
 
-        assert response.json()["daily_capacity_minutes"] == 240
+        assert response.json()["timezone"] == "Europe/London"
 
     async def test_password_change_logs_out_everywhere(
         self, api_client: AsyncClient

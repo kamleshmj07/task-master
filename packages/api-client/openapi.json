@@ -935,7 +935,7 @@
           "tasks"
         ],
         "summary": "Handle Create Task",
-        "description": "Create a task, optionally under one of the user's goals.",
+        "description": "Create a task with its steps, optionally under one of the user's goals.",
         "operationId": "handle_create_task_tasks_post",
         "security": [
           {
@@ -1221,6 +1221,191 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/steps": {
+      "post": {
+        "tags": [
+          "steps"
+        ],
+        "summary": "Handle Add Step",
+        "description": "Add a step to the end of a task.",
+        "operationId": "handle_add_step_tasks__task_id__steps_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/steps/{step_id}": {
+      "patch": {
+        "tags": [
+          "steps"
+        ],
+        "summary": "Handle Update Step",
+        "description": "Rename a step or tick it off. Ticking never completes the task itself.",
+        "operationId": "handle_update_step_tasks__task_id__steps__step_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "step_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Step Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "steps"
+        ],
+        "summary": "Handle Delete Step",
+        "description": "Remove a step. A task always keeps at least one.",
+        "operationId": "handle_delete_step_tasks__task_id__steps__step_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "step_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Step Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1812,7 +1997,7 @@
           "plans"
         ],
         "summary": "Handle Get Plan",
-        "description": "The day's Top 3 and routines, with planned minutes against capacity.",
+        "description": "The day's Top 3 tasks and, separately, its routines.",
         "operationId": "handle_get_plan_plans__plan_date__get",
         "security": [
           {
@@ -2057,30 +2242,6 @@
           "password"
         ],
         "title": "Body_handle_web_login_auth_web_login_post"
-      },
-      "Capacity": {
-        "properties": {
-          "limit_minutes": {
-            "type": "integer",
-            "title": "Limit Minutes"
-          },
-          "planned_minutes": {
-            "type": "integer",
-            "title": "Planned Minutes"
-          },
-          "over": {
-            "type": "boolean",
-            "title": "Over"
-          }
-        },
-        "type": "object",
-        "required": [
-          "limit_minutes",
-          "planned_minutes",
-          "over"
-        ],
-        "title": "Capacity",
-        "description": "Planned minutes against the user's daily capacity."
       },
       "DueRoutine": {
         "properties": {
@@ -2359,17 +2520,13 @@
             },
             "type": "array",
             "title": "Routines"
-          },
-          "capacity": {
-            "$ref": "#/components/schemas/Capacity"
           }
         },
         "type": "object",
         "required": [
           "plan_date",
           "top_three",
-          "routines",
-          "capacity"
+          "routines"
         ],
         "title": "PlanRead",
         "description": "A day: its Top 3 tasks and, separately, its routines."
@@ -2609,19 +2766,6 @@
               }
             ],
             "title": "Goal Id"
-          },
-          "estimate_minutes": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 1440.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimate Minutes"
           }
         },
         "type": "object",
@@ -2666,17 +2810,6 @@
           "title": {
             "type": "string",
             "title": "Title"
-          },
-          "estimate_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimate Minutes"
           },
           "frequency": {
             "$ref": "#/components/schemas/RoutineFrequency"
@@ -2732,7 +2865,6 @@
           "id",
           "goal_id",
           "title",
-          "estimate_minutes",
           "frequency",
           "weekdays",
           "day_of_month",
@@ -2770,19 +2902,6 @@
               }
             ],
             "title": "Goal Id"
-          },
-          "estimate_minutes": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 1440.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimate Minutes"
           },
           "frequency": {
             "anyOf": [
@@ -2852,6 +2971,78 @@
         "title": "RoutineUpdate",
         "description": "Partial routine update; schedule fields are checked together."
       },
+      "StepCreate": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "StepCreate",
+        "description": "A step added to the end of a task."
+      },
+      "StepRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "done"
+        ],
+        "title": "StepRead",
+        "description": "One step of a task."
+      },
+      "StepUpdate": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "done": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "title": "StepUpdate",
+        "description": "Rename a step, or tick it off (`done: true`) or back (`done: false`)."
+      },
       "SuggestionRead": {
         "properties": {
           "headline": {
@@ -2906,13 +3097,18 @@
             "minLength": 1,
             "title": "Title"
           },
-          "next_action": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Next Action"
+          "steps": {
+            "items": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Steps"
           },
-          "estimate_minutes": {
+          "time_limit_minutes": {
             "anyOf": [
               {
                 "type": "integer",
@@ -2923,7 +3119,7 @@
                 "type": "null"
               }
             ],
-            "title": "Estimate Minutes"
+            "title": "Time Limit Minutes"
           },
           "due_date": {
             "anyOf": [
@@ -2941,10 +3137,10 @@
         "type": "object",
         "required": [
           "title",
-          "next_action"
+          "steps"
         ],
         "title": "TaskCreate",
-        "description": "New task; it needs a concrete next action and may serve a goal.\n\nLeaving out `due_date` puts the task in Someday."
+        "description": "New task: its steps, in order, starting with a concrete first one.\n\nLeaving out `due_date` puts the task in Someday."
       },
       "TaskRead": {
         "properties": {
@@ -2969,11 +3165,14 @@
             "type": "string",
             "title": "Title"
           },
-          "next_action": {
-            "type": "string",
-            "title": "Next Action"
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepRead"
+            },
+            "type": "array",
+            "title": "Steps"
           },
-          "estimate_minutes": {
+          "time_limit_minutes": {
             "anyOf": [
               {
                 "type": "integer"
@@ -2982,7 +3181,7 @@
                 "type": "null"
               }
             ],
-            "title": "Estimate Minutes"
+            "title": "Time Limit Minutes"
           },
           "due_date": {
             "anyOf": [
@@ -3024,6 +3223,19 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "next_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Step",
+            "description": "Text of the first step not yet done, if any.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -3031,17 +3243,18 @@
           "id",
           "goal_id",
           "title",
-          "next_action",
-          "estimate_minutes",
+          "steps",
+          "time_limit_minutes",
           "due_date",
           "status",
           "postpone_count",
           "completed_at",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "next_step"
         ],
         "title": "TaskRead",
-        "description": "A task as returned by the API."
+        "description": "A task as returned by the API, with its steps in order.\n\n`next_step` is the first unfinished step: the task's next action."
       },
       "TaskStatus": {
         "type": "string",
@@ -3079,20 +3292,7 @@
             ],
             "title": "Title"
           },
-          "next_action": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 500,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Action"
-          },
-          "estimate_minutes": {
+          "time_limit_minutes": {
             "anyOf": [
               {
                 "type": "integer",
@@ -3103,7 +3303,7 @@
                 "type": "null"
               }
             ],
-            "title": "Estimate Minutes"
+            "title": "Time Limit Minutes"
           },
           "due_date": {
             "anyOf": [
@@ -3130,7 +3330,7 @@
         },
         "type": "object",
         "title": "TaskUpdate",
-        "description": "Partial task update. Setting `status` maintains `completed_at`."
+        "description": "Partial task update. Setting `status` maintains `completed_at`.\n\nSteps change through the task's `/steps` routes."
       },
       "TokenPairResponse": {
         "properties": {
@@ -3213,13 +3413,6 @@
             "type": "string",
             "title": "Timezone",
             "default": "UTC"
-          },
-          "daily_capacity_minutes": {
-            "type": "integer",
-            "maximum": 1440.0,
-            "minimum": 1.0,
-            "title": "Daily Capacity Minutes",
-            "default": 480
           }
         },
         "type": "object",
@@ -3260,18 +3453,13 @@
           "timezone": {
             "type": "string",
             "title": "Timezone"
-          },
-          "daily_capacity_minutes": {
-            "type": "integer",
-            "title": "Daily Capacity Minutes"
           }
         },
         "type": "object",
         "required": [
           "id",
           "email",
-          "timezone",
-          "daily_capacity_minutes"
+          "timezone"
         ],
         "title": "UserRead",
         "description": "Public view of an account."
@@ -3344,19 +3532,6 @@
               }
             ],
             "title": "Timezone"
-          },
-          "daily_capacity_minutes": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 1440.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Daily Capacity Minutes"
           }
         },
         "type": "object",

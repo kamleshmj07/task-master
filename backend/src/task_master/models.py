@@ -20,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -104,12 +104,6 @@ class User(TimestampMixin, Base):
     """An account. Auth columns match fastapi-users' expected schema."""
 
     __tablename__ = "user"
-    __table_args__ = (
-        CheckConstraint(
-            "daily_capacity_minutes BETWEEN 1 AND 1440", name="daily_capacity_range"
-        ),
-    )
-
     if TYPE_CHECKING:
         # Plain types so `User` satisfies fastapi-users' `UserProtocol`.
         id: uuid.UUID
@@ -126,7 +120,6 @@ class User(TimestampMixin, Base):
         is_superuser: Mapped[bool] = mapped_column(default=False)
         is_verified: Mapped[bool] = mapped_column(default=False)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
-    daily_capacity_minutes: Mapped[int] = mapped_column(default=480)
 
 
 def utc_now() -> datetime:
@@ -189,9 +182,10 @@ class Goal(TimestampMixin, Base):
 
 
 class Task(TimestampMixin, Base):
-    """A unit of work with a concrete next action, optionally toward a goal.
+    """A unit of work, broken into steps, optionally toward a goal.
 
-    A task with no due date sits in the Someday bucket.
+    The first unfinished step is the task's next action. A task with no due
+    date sits in the Someday bucket.
     """
 
     __tablename__ = "task"
@@ -203,9 +197,8 @@ class Task(TimestampMixin, Base):
             ["goal.id", "goal.user_id"],
             ondelete="CASCADE",
         ),
-        CheckConstraint("estimate_minutes > 0", name="estimate_positive"),
+        CheckConstraint("time_limit_minutes > 0", name="time_limit_positive"),
         CheckConstraint("postpone_count >= 0", name="postpone_count_non_negative"),
-        CheckConstraint("length(trim(next_action)) > 0", name="next_action_present"),
         UniqueConstraint("id", "user_id"),
     )
 
@@ -215,14 +208,37 @@ class Task(TimestampMixin, Base):
     )
     goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     title: Mapped[str] = mapped_column(String(200))
-    next_action: Mapped[str] = mapped_column(String(500))
-    estimate_minutes: Mapped[int | None]
+    # Total time the user allows for the task, across all sittings.
+    time_limit_minutes: Mapped[int | None]
     due_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[TaskStatus] = mapped_column(
         _enum_column(TaskStatus), default=TaskStatus.TODO
     )
     postpone_count: Mapped[int] = mapped_column(default=0)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    steps: Mapped[list[TaskStep]] = relationship(
+        order_by="TaskStep.position, TaskStep.id",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
+
+
+class TaskStep(Base):
+    """One checklist step of a task, in `position` order."""
+
+    __tablename__ = "task_step"
+    __table_args__ = (
+        CheckConstraint("length(trim(text)) > 0", name="text_present"),
+        CheckConstraint("position >= 0", name="position_non_negative"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int]
+    text: Mapped[str] = mapped_column(String(500))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TaskPostponement(Base):
@@ -312,7 +328,6 @@ class Routine(TimestampMixin, Base):
         ),
         UniqueConstraint("id", "user_id"),
         CheckConstraint("end_date >= start_date", name="ends_after_start"),
-        CheckConstraint("estimate_minutes > 0", name="estimate_positive"),
         CheckConstraint(
             "(frequency = 'weekly') = (weekdays IS NOT NULL)", name="weekly_has_days"
         ),
@@ -334,7 +349,6 @@ class Routine(TimestampMixin, Base):
     )
     goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     title: Mapped[str] = mapped_column(String(200))
-    estimate_minutes: Mapped[int | None]
     frequency: Mapped[RoutineFrequency] = mapped_column(_enum_column(RoutineFrequency))
     # ISO weekday numbers minus one: 0 = Monday ... 6 = Sunday.
     weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))

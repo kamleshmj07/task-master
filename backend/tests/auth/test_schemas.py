@@ -10,10 +10,10 @@ PASSWORD = "correct-horse-battery"
 
 
 class TestUserCreate:
-    def test_defaults_to_utc_and_eight_hours(self) -> None:
+    def test_defaults_to_utc(self) -> None:
         user = UserCreate(email=EMAIL, password=PASSWORD)
 
-        assert (user.timezone, user.daily_capacity_minutes) == ("UTC", 480)
+        assert user.timezone == "UTC"
 
     def test_accepts_iana_timezone(self) -> None:
         user = UserCreate(email=EMAIL, password=PASSWORD, timezone="Asia/Kolkata")
@@ -24,14 +24,9 @@ class TestUserCreate:
         with pytest.raises(ValidationError):
             UserCreate(email=EMAIL, password=PASSWORD, timezone="Mars/Olympus")
 
-    @pytest.mark.parametrize("minutes", [0, 1441])
-    def test_rejects_capacity_out_of_range(self, minutes: int) -> None:
-        with pytest.raises(ValidationError):
-            UserCreate(email=EMAIL, password=PASSWORD, daily_capacity_minutes=minutes)
-
 
 class TestUserUpdate:
     def test_leaves_unset_fields_out(self) -> None:
-        update = UserUpdate(daily_capacity_minutes=60)
+        update = UserUpdate(timezone="Asia/Kolkata")
 
-        assert update.create_update_dict() == {"daily_capacity_minutes": 60}
+        assert update.create_update_dict() == {"timezone": "Asia/Kolkata"}

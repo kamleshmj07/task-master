@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import SessionDep
-from task_master.models import Goal, Task, TaskStatus, utc_now
+from task_master.models import Goal, Task, TaskStatus, TaskStep, utc_now
 from task_master.queries import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, get_owned_or_404
 from task_master.schemas import TaskCreate, TaskRead, TaskUpdate
 
@@ -19,10 +19,17 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 async def handle_create_task(
     body: TaskCreate, user: CurrentUserDep, session: SessionDep
 ) -> TaskRead:
-    """Create a task, optionally under one of the user's goals."""
+    """Create a task with its steps, optionally under one of the user's goals."""
     if body.goal_id is not None:
         await get_owned_or_404(session, Goal, body.goal_id, user.id)
-    task = Task(user_id=user.id, **body.model_dump())
+    task = Task(
+        user_id=user.id,
+        **body.model_dump(exclude={"steps"}),
+        steps=[
+            TaskStep(position=position, text=text)
+            for position, text in enumerate(body.steps)
+        ],
+    )
     session.add(task)
     await session.commit()
     await session.refresh(task)

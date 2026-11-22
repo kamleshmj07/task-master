@@ -20,8 +20,8 @@ async def create_task(
     payload = {
         "goal_id": goal_id,
         "title": "Buy running shoes",
-        "next_action": "Open the shop website",
-        "estimate_minutes": 20,
+        "steps": ["Open the shop website", "Pick a pair"],
+        "time_limit_minutes": 20,
         **fields,
     }
     response = await client.post("/tasks", json=payload, headers=headers)
@@ -59,8 +59,9 @@ class TestCreateTask:
             "id",
             "goal_id",
             "title",
-            "next_action",
-            "estimate_minutes",
+            "steps",
+            "next_step",
+            "time_limit_minutes",
             "due_date",
             "status",
             "postpone_count",
@@ -72,10 +73,12 @@ class TestCreateTask:
     @pytest.mark.parametrize(
         "fields",
         [
-            {"next_action": "   "},
-            {"next_action": "x" * 501},
-            {"estimate_minutes": 0},
-            {"estimate_minutes": 1441},
+            {"steps": []},
+            {"steps": ["   "]},
+            {"steps": ["x" * 501]},
+            {"steps": ["s"] * 51},
+            {"time_limit_minutes": 0},
+            {"time_limit_minutes": 1441},
             {"title": ""},
         ],
     )
@@ -83,13 +86,13 @@ class TestCreateTask:
         self, api_client: AsyncClient, auth_headers: Headers, fields: dict[str, Any]
     ) -> None:
         goal_id = await goal_id_for(api_client, auth_headers)
-        payload = {"goal_id": goal_id, "title": "T", "next_action": "Do it", **fields}
+        payload = {"goal_id": goal_id, "title": "T", "steps": ["Do it"], **fields}
 
         response = await api_client.post("/tasks", json=payload, headers=auth_headers)
 
         assert response.status_code == 422
 
-    async def test_requires_next_action(
+    async def test_requires_steps(
         self, api_client: AsyncClient, auth_headers: Headers
     ) -> None:
         goal_id = await goal_id_for(api_client, auth_headers)
@@ -104,7 +107,7 @@ class TestCreateTask:
         self, api_client: AsyncClient, auth_headers: Headers, other_headers: Headers
     ) -> None:
         foreign_goal = await goal_id_for(api_client, other_headers)
-        payload = {"goal_id": foreign_goal, "title": "T", "next_action": "Do it"}
+        payload = {"goal_id": foreign_goal, "title": "T", "steps": ["Do it"]}
 
         response = await api_client.post("/tasks", json=payload, headers=auth_headers)
 
@@ -287,7 +290,7 @@ class TestUpdateTask:
 
         assert response.status_code == 404
 
-    async def test_rejects_null_next_action(
+    async def test_rejects_null_title(
         self, api_client: AsyncClient, auth_headers: Headers
     ) -> None:
         task = await create_task(
@@ -295,10 +298,25 @@ class TestUpdateTask:
         )
 
         response = await api_client.patch(
-            f"/tasks/{task['id']}", json={"next_action": None}, headers=auth_headers
+            f"/tasks/{task['id']}", json={"title": None}, headers=auth_headers
         )
 
         assert response.status_code == 422
+
+    async def test_clears_time_limit(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await create_task(
+            api_client, auth_headers, await goal_id_for(api_client, auth_headers)
+        )
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}",
+            json={"time_limit_minutes": None},
+            headers=auth_headers,
+        )
+
+        assert response.json()["time_limit_minutes"] is None
 
     async def test_ignores_postpone_count(
         self, api_client: AsyncClient, auth_headers: Headers
@@ -463,7 +481,7 @@ class TestGoalLessTasks:
     ) -> None:
         response = await api_client.post(
             "/tasks",
-            json={"title": "Renew insurance", "next_action": "Call the broker"},
+            json={"title": "Renew insurance", "steps": ["Call the broker"]},
             headers=auth_headers,
         )
 

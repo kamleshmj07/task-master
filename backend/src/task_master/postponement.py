@@ -32,7 +32,7 @@ SUGGESTIONS: dict[PostponeReason, Suggestion] = {
     PostponeReason.STUCK: Suggestion(
         headline="Make the first step smaller",
         actions=(
-            "Rewrite the next action as one physical step of 15 minutes or less",
+            "Rewrite the next step as one physical action of 15 minutes or less",
             "Split this task into smaller tasks",
         ),
     ),
@@ -48,7 +48,7 @@ SUGGESTIONS: dict[PostponeReason, Suggestion] = {
         headline="Clear the way",
         actions=(
             "Write down exactly what you are waiting on and who can unblock it",
-            "Shrink the estimate so it fits your next free slot",
+            "Lower the time limit so it fits your next free slot",
         ),
     ),
     PostponeReason.OTHER: Suggestion(

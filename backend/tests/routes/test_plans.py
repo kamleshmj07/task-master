@@ -17,10 +17,10 @@ TODAY = "2026-11-22"
 async def new_task(
     client: AsyncClient, headers: Headers, title: str, minutes: int = 60
 ) -> dict[str, Any]:
-    """Create a goal-less task with an estimate."""
+    """Create a goal-less task with a time limit."""
     response = await client.post(
         "/tasks",
-        json={"title": title, "next_action": "Start", "estimate_minutes": minutes},
+        json={"title": title, "steps": ["Start"], "time_limit_minutes": minutes},
         headers=headers,
     )
     assert response.status_code == 201
@@ -41,8 +41,11 @@ class TestGetPlan:
     ) -> None:
         response = await api_client.get(f"/plans/{TODAY}", headers=auth_headers)
 
-        plan = response.json()
-        assert (plan["top_three"], plan["routines"]) == ([], [])
+        assert response.json() == {
+            "plan_date": TODAY,
+            "top_three": [],
+            "routines": [],
+        }
 
     async def test_keeps_routines_separate_from_top_three(
         self, api_client: AsyncClient, auth_headers: Headers
@@ -186,29 +189,3 @@ class TestSetPlan:
         response = await set_plan(api_client, auth_headers, [task["id"]])
 
         assert response.json()["top_three"][0]["task"]["goal_id"] == goal.json()["id"]
-
-
-class TestCapacity:
-    async def test_adds_top_three_and_routines(
-        self, api_client: AsyncClient, auth_headers: Headers
-    ) -> None:
-        task = await new_task(api_client, auth_headers, "Deep work", minutes=120)
-        await create_routine(api_client, auth_headers, estimate_minutes=30)
-
-        response = await set_plan(api_client, auth_headers, [task["id"]])
-
-        assert response.json()["capacity"] == {
-            "limit_minutes": 480,
-            "planned_minutes": 150,
-            "over": False,
-        }
-
-    async def test_flags_an_overfull_day(
-        self, api_client: AsyncClient, auth_headers: Headers
-    ) -> None:
-        tasks = [await new_task(api_client, auth_headers, t, minutes=200) for t in "AB"]
-        await create_routine(api_client, auth_headers, estimate_minutes=90)
-
-        response = await set_plan(api_client, auth_headers, [t["id"] for t in tasks])
-
-        assert response.json()["capacity"]["over"] is True

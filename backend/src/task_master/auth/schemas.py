@@ -18,28 +18,24 @@ def _validate_timezone(value: str) -> str:
 
 
 Timezone = Annotated[str, AfterValidator(_validate_timezone)]
-DailyCapacity = Annotated[int, Field(ge=1, le=1440)]
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
     """Public view of an account."""
 
     timezone: str
-    daily_capacity_minutes: int
 
 
 class UserCreate(schemas.BaseUserCreate):
     """Registration payload."""
 
     timezone: Timezone = "UTC"
-    daily_capacity_minutes: DailyCapacity = 480
 
 
 class UserUpdate(schemas.BaseUserUpdate):
     """Partial account update."""
 
     timezone: Timezone | None = None
-    daily_capacity_minutes: DailyCapacity | None = None
 
 
 class AccessTokenResponse(BaseModel):

@@ -21,7 +21,6 @@ async def create_routine(
     payload = {
         "title": "Workout",
         "frequency": "daily",
-        "estimate_minutes": 30,
         "start_date": "2026-01-01",
         "end_date": "2026-12-31",
         **fields,
@@ -61,7 +60,6 @@ class TestCreateRoutine:
             {"frequency": "monthly"},
             {"end_date": "2025-01-01"},
             {"title": " "},
-            {"estimate_minutes": 0},
         ],
     )
     async def test_rejects_invalid_routine(

@@ -267,7 +267,7 @@ export interface paths {
         put?: never;
         /**
          * Handle Create Task
-         * @description Create a task, optionally under one of the user's goals.
+         * @description Create a task with its steps, optionally under one of the user's goals.
          */
         post: operations["handle_create_task_tasks_post"];
         delete?: never;
@@ -302,6 +302,50 @@ export interface paths {
          * @description Change a task; moving it requires owning the destination goal.
          */
         patch: operations["handle_update_task_tasks__task_id__patch"];
+        trace?: never;
+    };
+    "/tasks/{task_id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Add Step
+         * @description Add a step to the end of a task.
+         */
+        post: operations["handle_add_step_tasks__task_id__steps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/steps/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Handle Delete Step
+         * @description Remove a step. A task always keeps at least one.
+         */
+        delete: operations["handle_delete_step_tasks__task_id__steps__step_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Handle Update Step
+         * @description Rename a step or tick it off. Ticking never completes the task itself.
+         */
+        patch: operations["handle_update_step_tasks__task_id__steps__step_id__patch"];
         trace?: never;
     };
     "/tasks/{task_id}/postpone": {
@@ -449,7 +493,7 @@ export interface paths {
         };
         /**
          * Handle Get Plan
-         * @description The day's Top 3 and routines, with planned minutes against capacity.
+         * @description The day's Top 3 tasks and, separately, its routines.
          */
         get: operations["handle_get_plan_plans__plan_date__get"];
         /**
@@ -534,18 +578,6 @@ export interface components {
              * Format: password
              */
             client_secret?: string | null;
-        };
-        /**
-         * Capacity
-         * @description Planned minutes against the user's daily capacity.
-         */
-        Capacity: {
-            /** Limit Minutes */
-            limit_minutes: number;
-            /** Planned Minutes */
-            planned_minutes: number;
-            /** Over */
-            over: boolean;
         };
         /**
          * DueRoutine
@@ -663,7 +695,6 @@ export interface components {
             top_three: components["schemas"]["PlanItem"][];
             /** Routines */
             routines: components["schemas"]["DueRoutine"][];
-            capacity: components["schemas"]["Capacity"];
         };
         /**
          * PlanUpdate
@@ -759,8 +790,6 @@ export interface components {
             title: string;
             /** Goal Id */
             goal_id?: string | null;
-            /** Estimate Minutes */
-            estimate_minutes?: number | null;
         };
         /**
          * RoutineFrequency
@@ -782,8 +811,6 @@ export interface components {
             goal_id: string | null;
             /** Title */
             title: string;
-            /** Estimate Minutes */
-            estimate_minutes: number | null;
             frequency: components["schemas"]["RoutineFrequency"];
             /** Weekdays */
             weekdays: number[] | null;
@@ -819,8 +846,6 @@ export interface components {
             title?: string | null;
             /** Goal Id */
             goal_id?: string | null;
-            /** Estimate Minutes */
-            estimate_minutes?: number | null;
             frequency?: components["schemas"]["RoutineFrequency"] | null;
             /** Weekdays */
             weekdays?: number[] | null;
@@ -830,6 +855,39 @@ export interface components {
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
+        };
+        /**
+         * StepCreate
+         * @description A step added to the end of a task.
+         */
+        StepCreate: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * StepRead
+         * @description One step of a task.
+         */
+        StepRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Text */
+            text: string;
+            /** Done */
+            done: boolean;
+        };
+        /**
+         * StepUpdate
+         * @description Rename a step, or tick it off (`done: true`) or back (`done: false`).
+         */
+        StepUpdate: {
+            /** Text */
+            text?: string | null;
+            /** Done */
+            done?: boolean | null;
         };
         /**
          * SuggestionRead
@@ -845,7 +903,7 @@ export interface components {
         };
         /**
          * TaskCreate
-         * @description New task; it needs a concrete next action and may serve a goal.
+         * @description New task: its steps, in order, starting with a concrete first one.
          *
          *     Leaving out `due_date` puts the task in Someday.
          */
@@ -854,16 +912,18 @@ export interface components {
             goal_id?: string | null;
             /** Title */
             title: string;
-            /** Next Action */
-            next_action: string;
-            /** Estimate Minutes */
-            estimate_minutes?: number | null;
+            /** Steps */
+            steps: string[];
+            /** Time Limit Minutes */
+            time_limit_minutes?: number | null;
             /** Due Date */
             due_date?: string | null;
         };
         /**
          * TaskRead
-         * @description A task as returned by the API.
+         * @description A task as returned by the API, with its steps in order.
+         *
+         *     `next_step` is the first unfinished step: the task's next action.
          */
         TaskRead: {
             /**
@@ -875,10 +935,10 @@ export interface components {
             goal_id: string | null;
             /** Title */
             title: string;
-            /** Next Action */
-            next_action: string;
-            /** Estimate Minutes */
-            estimate_minutes: number | null;
+            /** Steps */
+            steps: components["schemas"]["StepRead"][];
+            /** Time Limit Minutes */
+            time_limit_minutes: number | null;
             /** Due Date */
             due_date: string | null;
             status: components["schemas"]["TaskStatus"];
@@ -896,6 +956,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Next Step
+             * @description Text of the first step not yet done, if any.
+             */
+            readonly next_step: string | null;
         };
         /**
          * TaskStatus
@@ -906,16 +971,16 @@ export interface components {
         /**
          * TaskUpdate
          * @description Partial task update. Setting `status` maintains `completed_at`.
+         *
+         *     Steps change through the task's `/steps` routes.
          */
         TaskUpdate: {
             /** Goal Id */
             goal_id?: string | null;
             /** Title */
             title?: string | null;
-            /** Next Action */
-            next_action?: string | null;
-            /** Estimate Minutes */
-            estimate_minutes?: number | null;
+            /** Time Limit Minutes */
+            time_limit_minutes?: number | null;
             /** Due Date */
             due_date?: string | null;
             status?: components["schemas"]["TaskStatus"] | null;
@@ -970,11 +1035,6 @@ export interface components {
              * @default UTC
              */
             timezone?: string;
-            /**
-             * Daily Capacity Minutes
-             * @default 480
-             */
-            daily_capacity_minutes?: number;
         };
         /**
          * UserRead
@@ -1008,8 +1068,6 @@ export interface components {
             is_verified?: boolean;
             /** Timezone */
             timezone: string;
-            /** Daily Capacity Minutes */
-            daily_capacity_minutes: number;
         };
         /**
          * UserUpdate
@@ -1028,8 +1086,6 @@ export interface components {
             is_verified?: boolean | null;
             /** Timezone */
             timezone?: string | null;
-            /** Daily Capacity Minutes */
-            daily_capacity_minutes?: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1849,6 +1905,109 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_add_step_tasks__task_id__steps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_delete_step_tasks__task_id__steps__step_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_update_step_tasks__task_id__steps__step_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpdate"];
             };
         };
         responses: {

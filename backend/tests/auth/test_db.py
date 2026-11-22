@@ -39,9 +39,9 @@ class TestUserDatabase:
     async def test_updates_fields(self, db_session: AsyncSession) -> None:
         user = await make_user(db_session)
 
-        await UserDatabase(db_session).update(user, {"daily_capacity_minutes": 300})
+        await UserDatabase(db_session).update(user, {"timezone": "Asia/Kolkata"})
 
-        assert user.daily_capacity_minutes == 300
+        assert user.timezone == "Asia/Kolkata"
 
     async def test_deletes_user(self, db_session: AsyncSession) -> None:
         user = await make_user(db_session)

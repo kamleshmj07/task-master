@@ -26,6 +26,7 @@ MVP_TABLES = {
     "daily_plan_item",
     "routine",
     "routine_completion",
+    "task_step",
 }
 
 
@@ -156,6 +157,8 @@ class TestSimplifyPostponeReasons:
         self, migrated_db: str, alembic_config: Config
     ) -> None:
         new_reasons = ["stuck", "dreading", "blocked"]
+        # The raw-SQL seed matches the schema before steps replaced next_action.
+        command.downgrade(alembic_config, BEFORE_STEPS)
         try:
             _run_on_db(migrated_db, _seed_postponements(new_reasons))
             command.downgrade(alembic_config, BEFORE_REASONS)
@@ -184,6 +187,7 @@ class TestDefaultGoalBackfill:
 
 
 BEFORE_ROUTINES = "e04dfba4791d"
+BEFORE_STEPS = "c2497c12038c"
 
 
 def _seed_user(connection: Connection) -> None:
@@ -194,5 +198,32 @@ def _seed_user(connection: Connection) -> None:
 def _seed_goal_titles(connection: Connection) -> list[str]:
     rows = connection.execute(
         text("SELECT title FROM goal WHERE user_id = :id"), {"id": SEED_USER_ID}
+    )
+    return list(rows.scalars())
+
+
+class TestTaskSteps:
+    def test_upgrade_turns_next_action_into_first_step(
+        self, migrated_db: str, alembic_config: Config
+    ) -> None:
+        command.downgrade(alembic_config, BEFORE_STEPS)
+        try:
+            _run_on_db(migrated_db, _seed_user)
+            command.upgrade(alembic_config, "head")
+            steps = _run_on_db(migrated_db, _seed_step_texts)
+        finally:
+            _run_on_db(migrated_db, _delete_seed)
+            command.upgrade(alembic_config, "head")
+
+        assert steps == ["Start"]
+
+
+def _seed_step_texts(connection: Connection) -> list[str]:
+    rows = connection.execute(
+        text(
+            "SELECT s.text FROM task_step s JOIN task t ON t.id = s.task_id"
+            " WHERE t.user_id = :id ORDER BY s.position"
+        ),
+        {"id": SEED_USER_ID},
     )
     return list(rows.scalars())
