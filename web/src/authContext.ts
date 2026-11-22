@@ -8,6 +8,8 @@ export interface Auth {
   login: (email: string, password: string) => Promise<string | null>
   register: (email: string, password: string) => Promise<string | null>
   logout: () => Promise<void>
+  /** Deletes the account and all its data; returns an error message or null. */
+  deleteAccount: (password: string) => Promise<string | null>
   setUser: (user: UserRead) => void
 }
 

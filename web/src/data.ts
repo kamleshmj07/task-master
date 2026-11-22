@@ -8,11 +8,40 @@ import type {
 import { api } from '@/api'
 import { daysBetween, WEEKDAYS } from '@/dates'
 
-export const REASONS: { value: PostponeReason; label: string }[] = [
-  { value: 'stuck', label: "I don't know where to start" },
-  { value: 'dreading', label: "I don't want to do it" },
-  { value: 'blocked', label: "Something's in the way" },
-  { value: 'other', label: 'Other…' },
+export interface ReasonOption {
+  value: PostponeReason
+  label: string
+  /** What the reason means, in a few words. */
+  hint: string
+  /** What the app will suggest for it. */
+  fix: string
+}
+
+export const REASONS: ReasonOption[] = [
+  {
+    value: 'stuck',
+    label: "I don't know where to start",
+    hint: 'Unclear, or too big',
+    fix: "We'll help you shrink the first step",
+  },
+  {
+    value: 'dreading',
+    label: "I don't want to do it",
+    hint: 'Boring, stressful or dreaded',
+    fix: "We'll help you lower the bar to start",
+  },
+  {
+    value: 'blocked',
+    label: "Something's in the way",
+    hint: 'Waiting on someone, or no time',
+    fix: "We'll help you make the blocker explicit",
+  },
+  {
+    value: 'other',
+    label: 'Other…',
+    hint: 'Tell us in your own words',
+    fix: "We'll help you replan",
+  },
 ]
 
 export async function loadGoals(): Promise<GoalRead[]> {
@@ -34,8 +63,6 @@ export function describeSchedule(routine: RoutineRead): string {
   }
 }
 
-export const TIME_LIMITS = [15, 30, 45, 60, 90, 120, 240] as const
-
 /** "45 min" or "1.5 hours"; empty when there is no limit. */
 export function timeLimitLabel(minutes: number | null | undefined): string {
   if (!minutes) return ''
@@ -45,26 +72,48 @@ export function timeLimitLabel(minutes: number | null | undefined): string {
 }
 
 export interface TaskGroup {
-  id: 'overdue' | 'today' | 'week' | 'later'
+  id: 'today' | 'week' | 'later' | 'ready' | 'overdue' | 'someday' | 'done'
   label: string
   tasks: TaskRead[]
 }
 
-/** Dated tasks split into Overdue, Today, This week and Later, soonest first. */
+function byDueDate(a: TaskRead, b: TaskRead): number {
+  return (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
+}
+
+/** Scheduled tasks split into Today, This week and Later, soonest first. */
 export function groupScheduled(tasks: TaskRead[], today: string): TaskGroup[] {
-  const dated = tasks
-    .filter((task): task is TaskRead & { due_date: string } => task.due_date !== null)
-    .sort((a, b) => a.due_date.localeCompare(b.due_date))
   const groups: TaskGroup[] = [
-    { id: 'overdue', label: 'Overdue', tasks: [] },
     { id: 'today', label: 'Today', tasks: [] },
     { id: 'week', label: 'This week', tasks: [] },
     { id: 'later', label: 'Later', tasks: [] },
   ]
-  for (const task of dated) {
+  for (const task of [...tasks].sort(byDueDate)) {
+    if (task.due_date === null) continue
     const delta = daysBetween(today, task.due_date)
-    const index = delta < 0 ? 0 : delta === 0 ? 1 : delta <= 7 ? 2 : 3
-    groups[index]?.tasks.push(task)
+    groups[delta <= 0 ? 0 : delta <= 7 ? 1 : 2]?.tasks.push(task)
   }
   return groups.filter((group) => group.tasks.length > 0)
+}
+
+/** Review tasks: every step done first, then the overdue ones. */
+export function groupReview(tasks: TaskRead[]): TaskGroup[] {
+  const ready = tasks.filter((task) => task.next_step === null)
+  const overdue = tasks.filter((task) => task.next_step !== null).sort(byDueDate)
+  return [
+    { id: 'ready' as const, label: 'Ready to complete', tasks: ready },
+    { id: 'overdue' as const, label: 'Overdue', tasks: overdue },
+  ].filter((group) => group.tasks.length > 0)
+}
+
+export type TimeUnit = 'min' | 'hours'
+
+/** The API's limit: 24 hours. */
+export const MAX_MINUTES = 1440
+
+/** Minutes for `amount` of `unit`, or null when the field is empty. */
+export function toMinutes(amount: string, unit: TimeUnit): number | null {
+  const value = Number(amount)
+  if (!amount.trim() || !Number.isFinite(value) || value <= 0) return null
+  return Math.round(unit === 'hours' ? value * 60 : value)
 }

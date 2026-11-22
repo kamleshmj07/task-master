@@ -3,7 +3,8 @@ import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { CloseIcon } from '@/components/Modal'
-import { TIME_LIMITS, timeLimitLabel } from '@/data'
+import { TimeLimitField } from '@/components/TimeLimitField'
+import { type TimeUnit, toMinutes } from '@/data'
 
 const NEW_GOAL = '__new'
 
@@ -20,7 +21,8 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
   const [steps, setSteps] = useState([''])
   const [goalId, setGoalId] = useState('')
   const [newGoal, setNewGoal] = useState('')
-  const [limit, setLimit] = useState('')
+  const [limitAmount, setLimitAmount] = useState('')
+  const [limitUnit, setLimitUnit] = useState<TimeUnit>('min')
   const [dueDate, setDueDate] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -45,7 +47,7 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
         title,
         steps: steps.map((step) => step.trim()).filter(Boolean),
         goal_id: goalId && !creatingGoal ? goalId : null,
-        time_limit_minutes: limit ? Number(limit) : null,
+        time_limit_minutes: toMinutes(limitAmount, limitUnit),
         due_date: dueDate || null,
       },
     })
@@ -137,19 +139,12 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
             </div>
           )}
         </div>
-        <label>
-          <span>
-            Time limit <span className="muted">· optional, total time</span>
-          </span>
-          <select value={limit} onChange={(e) => setLimit(e.target.value)}>
-            <option value="">No limit</option>
-            {TIME_LIMITS.map((minutes) => (
-              <option key={minutes} value={minutes}>
-                {timeLimitLabel(minutes)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <TimeLimitField
+          amount={limitAmount}
+          unit={limitUnit}
+          onAmountChange={setLimitAmount}
+          onUnitChange={setLimitUnit}
+        />
         <label>
           <span>
             Due date <span className="muted">· empty = Someday</span>

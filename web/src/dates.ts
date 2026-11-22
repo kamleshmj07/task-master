@@ -42,3 +42,28 @@ export function dueLabel(iso: string | null, today: string): string {
   if (delta < 0) return `Overdue · ${formatDay(iso)}`
   return formatDay(iso)
 }
+
+export interface QuickDate {
+  label: string
+  date: string
+}
+
+/** One-tap postpone dates, counted from `today`. */
+export function quickDates(today: string): QuickDate[] {
+  return [
+    { label: 'Tomorrow', date: addDays(today, 1) },
+    { label: 'In 3 days', date: addDays(today, 3) },
+    { label: 'Next week', date: addDays(today, 7) },
+  ]
+}
+
+/** The browser's IANA timezone, e.g. "Asia/Kolkata". */
+export function browserTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+/** Every IANA timezone the browser knows, always including `current`. */
+export function timezoneOptions(current: string): string[] {
+  const zones = Intl.supportedValuesOf('timeZone')
+  return zones.includes(current) ? zones : [current, ...zones]
+}

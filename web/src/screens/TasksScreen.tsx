@@ -3,24 +3,27 @@ import { useCallback, useState } from 'react'
 
 import { api } from '@/api'
 import { Modal } from '@/components/Modal'
-import { groupScheduled, loadGoals } from '@/data'
+import { groupReview, groupScheduled, loadGoals, type TaskGroup } from '@/data'
 import { todayIso } from '@/dates'
 import { NewTaskPanel } from '@/screens/NewTaskPanel'
 import { PostponeDialog, SuggestionCard } from '@/screens/PostponeForm'
 import { TaskCard } from '@/screens/TaskCard'
 import { type GoalFilter, type TaskView as View, usePagedTasks } from '@/usePagedTasks'
+import { announceNotificationsChanged } from '@/notifications'
 import { useResource } from '@/useResource'
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'scheduled', label: 'Scheduled' },
+  { id: 'review', label: 'Review' },
   { id: 'someday', label: 'Someday' },
   { id: 'done', label: 'Done' },
 ]
 
 const EMPTY_HINTS: Record<View, string> = {
   scheduled: 'Add a task with a due date to see it here.',
+  review: 'Overdue tasks and tasks with every step done show up here.',
   someday: 'Tasks without a date land here.',
-  done: 'Finished tasks show up here.',
+  done: 'Finished tasks from the last 90 days show up here.',
 }
 
 /** Tasks in three views: Scheduled (grouped by when), Someday and Done. */
@@ -44,12 +47,7 @@ export function TasksScreen() {
 
   const inView = tasks.tasks ?? []
   const count = (id: View) => tasks.counts?.[id] ?? 0
-  const groups =
-    view === 'scheduled'
-      ? groupScheduled(inView, today)
-      : [{ id: view, label: view === 'someday' ? 'No date yet' : 'Completed', tasks: inView }].filter(
-          (group) => group.tasks.length > 0,
-        )
+  const groups = groupsFor(view, inView, today)
 
   function handleChanged(_task: TaskRead, allStepsDone: boolean) {
     if (allStepsDone) setConfirming(_task)
@@ -88,7 +86,17 @@ export function TasksScreen() {
           </button>
         </div>
       )}
-      {suggestion && <SuggestionCard result={suggestion} onDismiss={() => setSuggestion(null)} />}
+      {suggestion && (
+        <SuggestionCard
+          result={suggestion}
+          onDismiss={() => setSuggestion(null)}
+          onOpenSteps={() => {
+            setView(suggestion.task.due_date ? 'scheduled' : 'someday')
+            setOpenId(suggestion.task.id)
+            setSuggestion(null)
+          }}
+        />
+      )}
 
       {adding && (
         <NewTaskPanel
@@ -180,6 +188,7 @@ export function TasksScreen() {
           onPostponed={(result) => {
             setPostponing(null)
             setSuggestion(result)
+            announceNotificationsChanged()
             void tasks.reload()
           }}
         />
@@ -200,4 +209,11 @@ export function TasksScreen() {
       )}
     </section>
   )
+}
+
+function groupsFor(view: View, tasks: TaskRead[], today: string): TaskGroup[] {
+  if (view === 'scheduled') return groupScheduled(tasks, today)
+  if (view === 'review') return groupReview(tasks)
+  const label = view === 'someday' ? 'No date yet' : 'Completed'
+  return tasks.length > 0 ? [{ id: view, label, tasks }] : []
 }

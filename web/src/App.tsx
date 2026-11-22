@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 
 import { AuthProvider } from '@/auth'
 import { useAuth } from '@/authContext'
+import { NotificationBell } from '@/components/NotificationBell'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { GoalsScreen } from '@/screens/GoalsScreen'
 import { RoutinesScreen } from '@/screens/RoutinesScreen'
 import { SettingsScreen } from '@/screens/SettingsScreen'
 import { TasksScreen } from '@/screens/TasksScreen'
 import { TodayScreen } from '@/screens/TodayScreen'
+import { WelcomeDialog } from '@/screens/WelcomeDialog'
 
 const SCREENS = {
   today: { label: 'Today', render: () => <TodayScreen /> },
@@ -59,15 +61,27 @@ function Shell() {
               </button>
             ))}
           </nav>
-          <AccountMenu email={user.email} onSettings={() => setScreen('settings')} />
+          <NotificationBell />
+          <AccountMenu
+            email={user.email}
+            name={user.display_name ?? null}
+            onSettings={() => setScreen('settings')}
+          />
         </div>
       </header>
       <main className="app">{SCREENS[screen].render()}</main>
+      {!user.display_name && <WelcomeDialog />}
     </div>
   )
 }
 
-function AccountMenu({ email, onSettings }: { email: string; onSettings: () => void }) {
+interface AccountMenuProps {
+  email: string
+  name: string | null
+  onSettings: () => void
+}
+
+function AccountMenu({ email, name, onSettings }: AccountMenuProps) {
   const { logout } = useAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -91,9 +105,9 @@ function AccountMenu({ email, onSettings }: { email: string; onSettings: () => v
     >
       <button type="button" className="ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="avatar" aria-hidden="true">
-          {email.slice(0, 2).toUpperCase()}
+          {initials(name ?? email)}
         </span>
-        <span className="hide-sm">{email}</span>
+        <span className="hide-sm">{name ?? email}</span>
       </button>
       {open && (
         <div className="menu" role="menu" aria-label="Account">
@@ -115,4 +129,11 @@ function AccountMenu({ email, onSettings }: { email: string; onSettings: () => v
       )}
     </div>
   )
+}
+
+/** "Ada Lovelace" → "AL"; "ada@example.com" → "AD". */
+function initials(text: string): string {
+  const words = text.split(/[\s@.]+/).filter(Boolean)
+  const letters = words.length > 1 ? `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}` : text.slice(0, 2)
+  return letters.toUpperCase()
 }

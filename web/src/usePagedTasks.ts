@@ -1,19 +1,13 @@
-import type { TaskCounts, TaskRead } from '@task-master/api-client'
+import type { TaskCounts, TaskRead, TaskView } from '@task-master/api-client'
 import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/api'
 
 export const PAGE_SIZE = 50
 
-export type TaskView = 'scheduled' | 'someday' | 'done'
+export type { TaskView }
 /** `'all'`, `'none'` (goal-less tasks) or a goal id. */
 export type GoalFilter = string
-
-const VIEW_QUERY = {
-  scheduled: { status: 'todo', someday: false },
-  someday: { status: 'todo', someday: true },
-  done: { status: 'done' },
-} as const
 
 function goalQuery(goal: GoalFilter) {
   if (goal === 'all') return {}
@@ -23,7 +17,7 @@ function goalQuery(goal: GoalFilter) {
 
 async function fetchPage(view: TaskView, goal: GoalFilter, offset: number): Promise<TaskRead[]> {
   const { data } = await api.GET('/tasks', {
-    params: { query: { ...VIEW_QUERY[view], ...goalQuery(goal), limit: PAGE_SIZE, offset } },
+    params: { query: { view, ...goalQuery(goal), limit: PAGE_SIZE, offset } },
   })
   return data ?? []
 }

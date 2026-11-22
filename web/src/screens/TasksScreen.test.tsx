@@ -28,13 +28,22 @@ const GOALS: GoalRead[] = [
 
 const TODAY = todayIso()
 
+type View = 'scheduled' | 'review' | 'someday' | 'done'
+
 interface Query {
-  status?: string
-  someday?: boolean
+  view?: View
   goal_id?: string
   no_goal?: boolean
   limit?: number
   offset?: number
+}
+
+/** The API's rule: each task sits in exactly one view. */
+function viewOf(task: TaskRead): View {
+  if (task.status === 'done') return 'done'
+  const overdue = task.due_date !== null && task.due_date < TODAY
+  if (task.next_step === null || overdue) return 'review'
+  return task.due_date === null ? 'someday' : 'scheduled'
 }
 
 /** Answer `/goals`, `/tasks` and `/tasks/counts` the way the API does. */
@@ -45,19 +54,16 @@ function mockData(tasks: TaskRead[]) {
     const byGoal = tasks.filter((task) =>
       query.no_goal ? task.goal_id === null : !query.goal_id || task.goal_id === query.goal_id,
     )
-    const open = byGoal.filter((task) => task.status === 'todo')
+    const count = (view: View) => byGoal.filter((task) => viewOf(task) === view).length
     if (path === '/tasks/counts') {
       return ok({
-        scheduled: open.filter((task) => task.due_date !== null).length,
-        someday: open.filter((task) => task.due_date === null).length,
-        done: byGoal.filter((task) => task.status === 'done').length,
+        scheduled: count('scheduled'),
+        review: count('review'),
+        someday: count('someday'),
+        done: count('done'),
       })
     }
-    const matching = byGoal.filter(
-      (task) =>
-        task.status === query.status &&
-        (query.someday === undefined || (task.due_date === null) === query.someday),
-    )
+    const matching = byGoal.filter((task) => viewOf(task) === query.view)
     const offset = query.offset ?? 0
     return ok(matching.slice(offset, offset + (query.limit ?? 50)))
   })
@@ -132,6 +138,32 @@ describe('TasksScreen views', () => {
     await screen.findByText('Renew insurance')
 
     expect(await findA11yViolations(container)).toEqual([])
+  })
+})
+
+describe('TasksScreen review', () => {
+  it('moves overdue tasks and finished-step tasks to Review', async () => {
+    mockData([
+      makeTask({ id: 'late', title: 'Late one', due_date: '2020-01-01' }),
+      makeTask({ id: 'ready', title: 'Ready one', steps: [{ id: 's', text: 'Only', done: true }] }),
+      makeTask({ id: 'soon', title: 'Soon one', due_date: '2099-01-01' }),
+    ])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Review 2' }))
+
+    expect(within(screen.getByRole('region', { name: 'Ready to complete' })).getByText('Ready one')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Overdue' })).getByText('Late one')).toBeInTheDocument()
+    expect(screen.queryByText('Soon one')).not.toBeInTheDocument()
+  })
+
+  it('no longer shows an Overdue group under Scheduled', async () => {
+    mockData([makeTask({ due_date: '2020-01-01' })])
+    render(<TasksScreen />)
+
+    await screen.findByRole('tab', { name: 'Scheduled 0' })
+
+    expect(screen.queryByRole('region', { name: 'Overdue' })).not.toBeInTheDocument()
   })
 })
 
@@ -234,6 +266,33 @@ describe('TasksScreen steps', () => {
   })
 })
 
+describe('Step order', () => {
+  it('no longer labels a step as Next', async () => {
+    mockData([makeTask({ due_date: TODAY })])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    expect(screen.queryByText('Next', { exact: true })).not.toBeInTheDocument()
+  })
+
+  it('moves a step with the keyboard', async () => {
+    const task = makeTask({ due_date: TODAY })
+    mockData([task])
+    mockApi.PUT.mockReturnValue(ok(task))
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    screen.getByRole('button', { name: /Reorder step “Find the policy”/ }).focus()
+    await userEvent.keyboard('{ArrowDown}')
+
+    expect(mockApi.PUT).toHaveBeenCalledWith('/tasks/{task_id}/steps/order', {
+      params: { path: { task_id: 't1' } },
+      body: { step_ids: ['s2', 's1'] },
+    })
+  })
+})
+
 describe('New task', () => {
   it('creates a task with its steps, goal and time limit', async () => {
     mockData([])
@@ -247,7 +306,8 @@ describe('New task', () => {
     await userEvent.click(within(form).getByRole('button', { name: '+ Add step' }))
     await userEvent.type(within(form).getByRole('textbox', { name: 'Step 2' }), 'Call the broker')
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Goal' }), 'Essentials')
-    await userEvent.selectOptions(within(form).getByRole('combobox', { name: /Time limit/ }), '45 min')
+    await userEvent.type(within(form).getByRole('spinbutton', { name: 'Time limit amount' }), '1.5')
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Time limit unit' }), 'hours')
     await userEvent.click(within(form).getByRole('button', { name: 'Add task' }))
 
     expect(mockApi.POST).toHaveBeenCalledWith('/tasks', {
@@ -255,7 +315,7 @@ describe('New task', () => {
         title: 'Renew insurance',
         steps: ['Find the policy', 'Call the broker'],
         goal_id: 'g1',
-        time_limit_minutes: 45,
+        time_limit_minutes: 90,
         due_date: null,
       },
     })

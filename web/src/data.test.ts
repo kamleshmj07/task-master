@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { describeSchedule, groupScheduled, timeLimitLabel } from '@/data'
-import { addDays, daysBetween, dueLabel, isoDate } from '@/dates'
+import { describeSchedule, groupReview, groupScheduled, timeLimitLabel, toMinutes } from '@/data'
+import { addDays, daysBetween, dueLabel, isoDate, quickDates } from '@/dates'
 import { makeRoutine, makeTask } from '@/test/fixtures'
 
 const TODAY = '2026-11-22'
@@ -36,20 +36,17 @@ describe('timeLimitLabel', () => {
 })
 
 describe('groupScheduled', () => {
-  it('splits dated tasks by when they are due, soonest first', () => {
+  it('splits tasks into Today, This week and Later, soonest first', () => {
     const tasks = [
       makeTask({ id: 'later', due_date: '2026-12-10' }),
       makeTask({ id: 'week-b', due_date: '2026-11-26' }),
-      makeTask({ id: 'overdue', due_date: '2026-11-20' }),
       makeTask({ id: 'today', due_date: TODAY }),
       makeTask({ id: 'week-a', due_date: '2026-11-23' }),
-      makeTask({ id: 'someday', due_date: null }),
     ]
 
     const groups = groupScheduled(tasks, TODAY).map((g) => [g.id, g.tasks.map((t) => t.id)])
 
     expect(groups).toEqual([
-      ['overdue', ['overdue']],
       ['today', ['today']],
       ['week', ['week-a', 'week-b']],
       ['later', ['later']],
@@ -59,6 +56,41 @@ describe('groupScheduled', () => {
   it('leaves out empty groups', () => {
     expect(groupScheduled([makeTask({ due_date: TODAY })], TODAY).map((g) => g.id)).toEqual([
       'today',
+    ])
+  })
+})
+
+describe('groupReview', () => {
+  it('puts tasks ready to complete before overdue ones', () => {
+    const ready = makeTask({ id: 'ready', steps: [{ id: 's', text: 'x', done: true }] })
+    const late = makeTask({ id: 'late', due_date: '2026-11-01' })
+
+    const groups = groupReview([late, ready]).map((g) => [g.id, g.tasks.map((t) => t.id)])
+
+    expect(groups).toEqual([
+      ['ready', ['ready']],
+      ['overdue', ['late']],
+    ])
+  })
+})
+
+describe('toMinutes', () => {
+  it.each([
+    ['', 'min', null],
+    ['45', 'min', 45],
+    ['1.5', 'hours', 90],
+    ['0', 'hours', null],
+  ] as const)('reads %j %s as %j', (amount, unit, minutes) => {
+    expect(toMinutes(amount, unit)).toBe(minutes)
+  })
+})
+
+describe('quickDates', () => {
+  it('offers tomorrow, three days and a week out', () => {
+    expect(quickDates(TODAY).map((d) => d.date)).toEqual([
+      '2026-11-23',
+      '2026-11-25',
+      '2026-11-29',
     ])
   })
 })

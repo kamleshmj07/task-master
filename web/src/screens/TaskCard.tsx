@@ -99,7 +99,10 @@ export function TaskCard({
 function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>) {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState<number | null>(null)
+  const [over, setOver] = useState<number | null>(null)
   const nextIndex = task.steps.findIndex((step) => !step.done)
+  const canReorder = task.steps.length > 1
 
   async function handleToggle(stepId: string, done: boolean) {
     const { data } = await api.PATCH('/tasks/{task_id}/steps/{step_id}', {
@@ -109,6 +112,24 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
     if (!data) return
     const allDone = data.steps.every((step) => step.done)
     onChanged(data, done && allDone && data.status === 'todo')
+  }
+
+  async function handleMove(from: number, to: number) {
+    if (from === to || to < 0 || to >= task.steps.length) return
+    const ids = task.steps.map((step) => step.id)
+    const [moved] = ids.splice(from, 1)
+    if (moved === undefined) return
+    ids.splice(to, 0, moved)
+    const { data, error: apiError } = await api.PUT('/tasks/{task_id}/steps/order', {
+      params: { path: { task_id: task.id } },
+      body: { step_ids: ids },
+    })
+    if (apiError || !data) {
+      setError(errorMessage(apiError))
+      return
+    }
+    setError(null)
+    onChanged(data, false)
   }
 
   async function handleDelete(stepId: string) {
@@ -140,10 +161,56 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
 
   return (
     <div className="steps">
-      <p className="eyebrow">Steps</p>
+      <p className="eyebrow">Steps{canReorder ? ' · drag to reorder' : ''}</p>
       <ul className="list">
         {task.steps.map((step, index) => (
-          <li key={step.id} className="step">
+          <li
+            key={step.id}
+            className={over === index && dragging !== index ? 'step drop-target' : 'step'}
+            draggable={canReorder}
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move'
+              setDragging(index)
+            }}
+            onDragOver={(event) => {
+              if (dragging === null) return
+              event.preventDefault()
+              setOver(index)
+            }}
+            onDragLeave={() => setOver(null)}
+            onDrop={(event) => {
+              event.preventDefault()
+              if (dragging !== null) void handleMove(dragging, index)
+              setDragging(null)
+              setOver(null)
+            }}
+            onDragEnd={() => {
+              setDragging(null)
+              setOver(null)
+            }}
+          >
+            {canReorder && (
+              <button
+                type="button"
+                className="ghost icon handle"
+                aria-label={`Reorder step “${step.text}”, use arrow keys`}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    void handleMove(index, index + (event.key === 'ArrowUp' ? -1 : 1))
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="9" cy="6" r="1.5" />
+                  <circle cx="15" cy="6" r="1.5" />
+                  <circle cx="9" cy="12" r="1.5" />
+                  <circle cx="15" cy="12" r="1.5" />
+                  <circle cx="9" cy="18" r="1.5" />
+                  <circle cx="15" cy="18" r="1.5" />
+                </svg>
+              </button>
+            )}
             <label className="choice grow">
               <input
                 type="checkbox"
@@ -155,7 +222,6 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
                 {step.text}
               </span>
             </label>
-            {index === nextIndex && task.status === 'todo' && <span className="pill today">Next</span>}
             {task.steps.length > 1 && (
               <button
                 type="button"
