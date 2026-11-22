@@ -259,9 +259,11 @@ export interface paths {
         };
         /**
          * Handle List Tasks
-         * @description List tasks, soonest due first (Someday last), with optional filters.
+         * @description List tasks a page at a time, with optional filters.
          *
-         *     `someday=true` lists only undated tasks; `someday=false` only dated ones.
+         *     Open tasks come soonest due first (Someday last); finished ones most
+         *     recently completed first. `someday=true` lists only undated tasks,
+         *     `someday=false` only dated ones; `no_goal=true` only goal-less ones.
          */
         get: operations["handle_list_tasks_tasks_get"];
         put?: never;
@@ -270,6 +272,26 @@ export interface paths {
          * @description Create a task with its steps, optionally under one of the user's goals.
          */
         post: operations["handle_create_task_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Count Tasks
+         * @description How many tasks are Scheduled, in Someday and Done, for the same filters.
+         */
+        get: operations["handle_count_tasks_tasks_counts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -900,6 +922,18 @@ export interface components {
             actions: string[];
             /** Reflection */
             reflection: string | null;
+        };
+        /**
+         * TaskCounts
+         * @description Task totals per view, so clients can page without losing counts.
+         */
+        TaskCounts: {
+            /** Scheduled */
+            scheduled: number;
+            /** Someday */
+            someday: number;
+            /** Done */
+            done: number;
         };
         /**
          * TaskCreate
@@ -1769,6 +1803,7 @@ export interface operations {
         parameters: {
             query?: {
                 goal_id?: string | null;
+                no_goal?: boolean;
                 status?: components["schemas"]["TaskStatus"] | null;
                 someday?: boolean | null;
                 limit?: number;
@@ -1820,6 +1855,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_count_tasks_tasks_counts_get: {
+        parameters: {
+            query?: {
+                goal_id?: string | null;
+                no_goal?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskCounts"];
                 };
             };
             /** @description Validation Error */

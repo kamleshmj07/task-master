@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     login_max_lock_seconds: PositiveInt = 15 * 60
     login_ip_failures: PositiveInt = 20
     login_ip_window_seconds: PositiveInt = 15 * 60
+    completed_task_retention_days: PositiveInt = 90
 
 
 @lru_cache

@@ -698,3 +698,9 @@ legend {
     flex-wrap: wrap;
   }
 }
+
+.load-more {
+  align-self: center;
+  min-height: 44px;
+  padding: 0 22px;
+}

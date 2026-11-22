@@ -980,7 +980,7 @@
           "tasks"
         ],
         "summary": "Handle List Tasks",
-        "description": "List tasks, soonest due first (Someday last), with optional filters.\n\n`someday=true` lists only undated tasks; `someday=false` only dated ones.",
+        "description": "List tasks a page at a time, with optional filters.\n\nOpen tasks come soonest due first (Someday last); finished ones most\nrecently completed first. `someday=true` lists only undated tasks,\n`someday=false` only dated ones; `no_goal=true` only goal-less ones.",
         "operationId": "handle_list_tasks_tasks_get",
         "security": [
           {
@@ -1003,6 +1003,16 @@
                 }
               ],
               "title": "Goal Id"
+            }
+          },
+          {
+            "name": "no_goal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "No Goal"
             }
           },
           {
@@ -1072,6 +1082,72 @@
                     "$ref": "#/components/schemas/TaskRead"
                   },
                   "title": "Response Handle List Tasks Tasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/counts": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Handle Count Tasks",
+        "description": "How many tasks are Scheduled, in Someday and Done, for the same filters.",
+        "operationId": "handle_count_tasks_tasks_counts_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "goal_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Goal Id"
+            }
+          },
+          {
+            "name": "no_goal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "No Goal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCounts"
                 }
               }
             }
@@ -3076,6 +3152,30 @@
         ],
         "title": "SuggestionRead",
         "description": "The fix suggested for a postponement."
+      },
+      "TaskCounts": {
+        "properties": {
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled"
+          },
+          "someday": {
+            "type": "integer",
+            "title": "Someday"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scheduled",
+          "someday",
+          "done"
+        ],
+        "title": "TaskCounts",
+        "description": "Task totals per view, so clients can page without losing counts."
       },
       "TaskCreate": {
         "properties": {

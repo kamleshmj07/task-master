@@ -520,3 +520,95 @@ class TestGoalLessTasks:
             [t["title"] for t in someday.json()],
             [t["title"] for t in dated.json()],
         ) == (["Undated"], ["Dated"])
+
+
+class TestCountsAndPaging:
+    async def test_counts_each_view(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal_id = await goal_id_for(api_client, auth_headers)
+        await create_task(api_client, auth_headers, goal_id, due_date="2099-01-01")
+        await create_task(api_client, auth_headers, goal_id)
+        done = await create_task(api_client, auth_headers, goal_id)
+        await api_client.patch(
+            f"/tasks/{done['id']}", json={"status": "done"}, headers=auth_headers
+        )
+
+        response = await api_client.get("/tasks/counts", headers=auth_headers)
+
+        assert response.json() == {"scheduled": 1, "someday": 1, "done": 1}
+
+    async def test_counts_only_own_tasks(
+        self, api_client: AsyncClient, auth_headers: Headers, other_headers: Headers
+    ) -> None:
+        await create_task(
+            api_client, other_headers, await goal_id_for(api_client, other_headers)
+        )
+
+        response = await api_client.get("/tasks/counts", headers=auth_headers)
+
+        assert response.json() == {"scheduled": 0, "someday": 0, "done": 0}
+
+    async def test_counts_follow_the_goal_filters(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal_id = await goal_id_for(api_client, auth_headers)
+        await create_task(api_client, auth_headers, goal_id)
+        await api_client.post(
+            "/tasks", json={"title": "Loose", "steps": ["Go"]}, headers=auth_headers
+        )
+
+        by_goal = await api_client.get(
+            "/tasks/counts", params={"goal_id": goal_id}, headers=auth_headers
+        )
+        no_goal = await api_client.get(
+            "/tasks/counts", params={"no_goal": True}, headers=auth_headers
+        )
+
+        assert (by_goal.json()["someday"], no_goal.json()["someday"]) == (1, 1)
+
+    async def test_lists_only_goal_less_tasks(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        await create_task(
+            api_client, auth_headers, await goal_id_for(api_client, auth_headers)
+        )
+        await api_client.post(
+            "/tasks", json={"title": "Loose", "steps": ["Go"]}, headers=auth_headers
+        )
+
+        response = await api_client.get(
+            "/tasks", params={"no_goal": True}, headers=auth_headers
+        )
+
+        assert [task["title"] for task in response.json()] == ["Loose"]
+
+    async def test_lists_finished_tasks_most_recent_first(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal_id = await goal_id_for(api_client, auth_headers)
+        for title in ("First done", "Second done"):
+            task = await create_task(api_client, auth_headers, goal_id, title=title)
+            await api_client.patch(
+                f"/tasks/{task['id']}", json={"status": "done"}, headers=auth_headers
+            )
+
+        response = await api_client.get(
+            "/tasks", params={"status": "done"}, headers=auth_headers
+        )
+
+        assert [t["title"] for t in response.json()] == ["Second done", "First done"]
+
+    async def test_pages_fifty_at_a_time_by_default(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal_id = await goal_id_for(api_client, auth_headers)
+        for index in range(51):
+            await create_task(api_client, auth_headers, goal_id, title=f"T{index}")
+
+        first = await api_client.get("/tasks", headers=auth_headers)
+        rest = await api_client.get(
+            "/tasks", params={"offset": 50}, headers=auth_headers
+        )
+
+        assert (len(first.json()), len(rest.json())) == (50, 1)

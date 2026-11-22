@@ -4,13 +4,13 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import SessionDep
 from task_master.models import Goal, Task, TaskStatus, TaskStep, utc_now
 from task_master.queries import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, get_owned_or_404
-from task_master.schemas import TaskCreate, TaskRead, TaskUpdate
+from task_master.schemas import TaskCounts, TaskCreate, TaskRead, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -41,26 +41,53 @@ async def handle_list_tasks(
     user: CurrentUserDep,
     session: SessionDep,
     goal_id: uuid.UUID | None = None,
+    no_goal: bool = False,
     task_status: Annotated[TaskStatus | None, Query(alias="status")] = None,
     someday: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[TaskRead]:
-    """List tasks, soonest due first (Someday last), with optional filters.
+    """List tasks a page at a time, with optional filters.
 
-    `someday=true` lists only undated tasks; `someday=false` only dated ones.
+    Open tasks come soonest due first (Someday last); finished ones most
+    recently completed first. `someday=true` lists only undated tasks,
+    `someday=false` only dated ones; `no_goal=true` only goal-less ones.
     """
-    statement = select(Task).where(Task.user_id == user.id)
-    if goal_id is not None:
-        statement = statement.where(Task.goal_id == goal_id)
+    statement = _owned_tasks(user.id, goal_id, no_goal)
     if task_status is not None:
         statement = statement.where(Task.status == task_status)
     if someday is not None:
         undated = Task.due_date.is_(None)
         statement = statement.where(undated if someday else ~undated)
-    order = (Task.due_date.asc().nulls_last(), Task.created_at, Task.id)
+    order = (
+        (Task.completed_at.desc().nulls_last(), Task.id)
+        if task_status is TaskStatus.DONE
+        else (Task.due_date.asc().nulls_last(), Task.created_at, Task.id)
+    )
     statement = statement.order_by(*order).limit(limit).offset(offset)
     return [TaskRead.model_validate(task) for task in await session.scalars(statement)]
+
+
+@router.get("/counts")
+async def handle_count_tasks(
+    user: CurrentUserDep,
+    session: SessionDep,
+    goal_id: uuid.UUID | None = None,
+    no_goal: bool = False,
+) -> TaskCounts:
+    """How many tasks are Scheduled, in Someday and Done, for the same filters."""
+    tasks = _owned_tasks(user.id, goal_id, no_goal).subquery()
+    is_open = tasks.c.status == TaskStatus.TODO
+    row = (
+        await session.execute(
+            select(
+                func.count().filter(is_open, tasks.c.due_date.is_not(None)),
+                func.count().filter(is_open, tasks.c.due_date.is_(None)),
+                func.count().filter(tasks.c.status == TaskStatus.DONE),
+            )
+        )
+    ).one()
+    return TaskCounts(scheduled=row[0], someday=row[1], done=row[2])
 
 
 @router.get("/{task_id}")
@@ -97,6 +124,18 @@ async def handle_delete_task(
     task = await get_owned_or_404(session, Task, task_id, user.id)
     await session.delete(task)
     await session.commit()
+
+
+def _owned_tasks(
+    user_id: uuid.UUID, goal_id: uuid.UUID | None, no_goal: bool
+) -> Select[Task]:
+    """The user's tasks, narrowed to one goal or to goal-less ones."""
+    statement = select(Task).where(Task.user_id == user_id)
+    if no_goal:
+        return statement.where(Task.goal_id.is_(None))
+    if goal_id is not None:
+        return statement.where(Task.goal_id == goal_id)
+    return statement
 
 
 def _with_completion(task: Task, changes: dict[str, Any]) -> dict[str, Any]:

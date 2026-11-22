@@ -28,11 +28,38 @@ const GOALS: GoalRead[] = [
 
 const TODAY = todayIso()
 
+interface Query {
+  status?: string
+  someday?: boolean
+  goal_id?: string
+  no_goal?: boolean
+  limit?: number
+  offset?: number
+}
+
+/** Answer `/goals`, `/tasks` and `/tasks/counts` the way the API does. */
 function mockData(tasks: TaskRead[]) {
-  mockApi.GET.mockImplementation((path: string, options?: { params?: { query?: { status?: string } } }) => {
+  mockApi.GET.mockImplementation((path: string, options?: { params?: { query?: Query } }) => {
     if (path === '/goals') return ok(GOALS)
-    const status = options?.params?.query?.status
-    return ok(tasks.filter((task) => task.status === status))
+    const query = options?.params?.query ?? {}
+    const byGoal = tasks.filter((task) =>
+      query.no_goal ? task.goal_id === null : !query.goal_id || task.goal_id === query.goal_id,
+    )
+    const open = byGoal.filter((task) => task.status === 'todo')
+    if (path === '/tasks/counts') {
+      return ok({
+        scheduled: open.filter((task) => task.due_date !== null).length,
+        someday: open.filter((task) => task.due_date === null).length,
+        done: byGoal.filter((task) => task.status === 'done').length,
+      })
+    }
+    const matching = byGoal.filter(
+      (task) =>
+        task.status === query.status &&
+        (query.someday === undefined || (task.due_date === null) === query.someday),
+    )
+    const offset = query.offset ?? 0
+    return ok(matching.slice(offset, offset + (query.limit ?? 50)))
   })
 }
 
@@ -105,6 +132,40 @@ describe('TasksScreen views', () => {
     await screen.findByText('Renew insurance')
 
     expect(await findA11yViolations(container)).toEqual([])
+  })
+})
+
+describe('TasksScreen paging', () => {
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, index) =>
+      makeTask({ id: `t${index}`, title: `Task ${index}`, due_date: null }),
+    )
+
+  it('loads 50 tasks and offers to load the rest', async () => {
+    mockData(many(60))
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('tab', { name: 'Someday 60' }))
+
+    expect(await screen.findByRole('button', { name: 'Load more · 10 more' })).toBeInTheDocument()
+    expect(screen.getAllByRole('article')).toHaveLength(50)
+  })
+
+  it('loads the next page on request', async () => {
+    mockData(many(60))
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('tab', { name: 'Someday 60' }))
+
+    await userEvent.click(await screen.findByRole('button', { name: /Load more/ }))
+
+    expect(await screen.findByText('Task 59')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Load more/ })).not.toBeInTheDocument()
+  })
+
+  it('takes counts from the server, not from loaded tasks', async () => {
+    mockData(many(120))
+    render(<TasksScreen />)
+
+    expect(await screen.findByRole('tab', { name: 'Someday 120' })).toBeInTheDocument()
   })
 })
 

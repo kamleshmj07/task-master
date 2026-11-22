@@ -8,10 +8,8 @@ import { todayIso } from '@/dates'
 import { NewTaskPanel } from '@/screens/NewTaskPanel'
 import { PostponeDialog, SuggestionCard } from '@/screens/PostponeForm'
 import { TaskCard } from '@/screens/TaskCard'
+import { type GoalFilter, type TaskView as View, usePagedTasks } from '@/usePagedTasks'
 import { useResource } from '@/useResource'
-
-type View = 'scheduled' | 'someday' | 'done'
-type GoalFilter = 'all' | 'none' | string
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'scheduled', label: 'Scheduled' },
@@ -25,26 +23,13 @@ const EMPTY_HINTS: Record<View, string> = {
   done: 'Finished tasks show up here.',
 }
 
-async function loadAllTasks(): Promise<TaskRead[]> {
-  const [open, done] = await Promise.all([
-    api.GET('/tasks', { params: { query: { status: 'todo', limit: 100 } } }),
-    api.GET('/tasks', { params: { query: { status: 'done', limit: 100 } } }),
-  ])
-  return [...(open.data ?? []), ...(done.data ?? [])]
-}
-
-function viewOf(task: TaskRead): View {
-  if (task.status === 'done') return 'done'
-  return task.due_date === null ? 'someday' : 'scheduled'
-}
-
 /** Tasks in three views: Scheduled (grouped by when), Someday and Done. */
 export function TasksScreen() {
   const today = todayIso()
-  const tasks = useResource(loadAllTasks)
   const goals = useResource(loadGoals)
   const [view, setView] = useState<View>('scheduled')
   const [goalFilter, setGoalFilter] = useState<GoalFilter>('all')
+  const tasks = usePagedTasks(view, goalFilter)
   const [adding, setAdding] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [postponing, setPostponing] = useState<TaskRead | null>(null)
@@ -57,11 +42,8 @@ export function TasksScreen() {
     [goals.data],
   )
 
-  const matchesGoal = (task: TaskRead) =>
-    goalFilter === 'all' || (goalFilter === 'none' ? task.goal_id === null : task.goal_id === goalFilter)
-  const filtered = (tasks.data ?? []).filter(matchesGoal)
-  const inView = filtered.filter((task) => viewOf(task) === view)
-  const count = (id: View) => filtered.filter((task) => viewOf(task) === id).length
+  const inView = tasks.tasks ?? []
+  const count = (id: View) => tasks.counts?.[id] ?? 0
   const groups =
     view === 'scheduled'
       ? groupScheduled(inView, today)
@@ -155,7 +137,7 @@ export function TasksScreen() {
         </div>
       </div>
 
-      {tasks.data && groups.length === 0 && (
+      {tasks.tasks && groups.length === 0 && (
         <div className="card empty">
           <p className="title">Nothing here</p>
           <p className="muted">{EMPTY_HINTS[view]}</p>
@@ -184,6 +166,12 @@ export function TasksScreen() {
           ))}
         </section>
       ))}
+
+      {tasks.remaining > 0 && (
+        <button type="button" className="load-more" onClick={() => void tasks.loadMore()}>
+          Load more · {tasks.remaining} more
+        </button>
+      )}
 
       {postponing && (
         <PostponeDialog

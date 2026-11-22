@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { addDays, formatDay, todayIso } from '@/dates'
+import { PAGE_SIZE } from '@/usePagedTasks'
 import { useResource } from '@/useResource'
 
 async function loadPlan(day: string): Promise<PlanRead | null> {
@@ -12,11 +13,17 @@ async function loadPlan(day: string): Promise<PlanRead | null> {
   return data ?? null
 }
 
-async function loadOpenTasks(): Promise<TaskRead[]> {
-  const { data } = await api.GET('/tasks', {
-    params: { query: { status: 'todo', limit: 100 } },
-  })
-  return data ?? []
+/** Open tasks, soonest due first, `count` at most: the Top 3 candidates. */
+async function loadOpenTasks(count: number): Promise<TaskRead[]> {
+  const tasks: TaskRead[] = []
+  while (tasks.length < count) {
+    const { data } = await api.GET('/tasks', {
+      params: { query: { status: 'todo', limit: PAGE_SIZE, offset: tasks.length } },
+    })
+    tasks.push(...(data ?? []))
+    if ((data ?? []).length < PAGE_SIZE) break
+  }
+  return tasks
 }
 
 /** One day: the Top 3 one-off tasks, and separately, the day's routines. */
@@ -24,7 +31,10 @@ export function TodayScreen() {
   const today = todayIso()
   const [day, setDay] = useState(today)
   const plan = useResource(useCallback(() => loadPlan(day), [day]))
-  const openTasks = useResource(loadOpenTasks)
+  const [candidateLimit, setCandidateLimit] = useState(PAGE_SIZE)
+  const openTasks = useResource(
+    useCallback(() => loadOpenTasks(candidateLimit), [candidateLimit]),
+  )
   const [error, setError] = useState<string | null>(null)
 
   const topThree = plan.data?.top_three ?? []
@@ -142,6 +152,17 @@ export function TodayScreen() {
               ))}
             </select>
           </label>
+        )}
+        {!isPast && topThree.length < 3 && (openTasks.data?.length ?? 0) >= candidateLimit && (
+          <div>
+            <button
+              type="button"
+              className="ghost accent"
+              onClick={() => setCandidateLimit(candidateLimit + PAGE_SIZE)}
+            >
+              Show more tasks to choose from
+            </button>
+          </div>
         )}
       </div>
 

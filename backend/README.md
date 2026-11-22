@@ -73,3 +73,15 @@ move them to Redis before scaling out.
 The web refresh cookie is `SameSite=Strict`, so in production the web app and
 the API must share a registrable domain (e.g. `app.example.com` and
 `api.example.com`).
+
+## Clean-up job
+
+Finished tasks stay under Done for 90 days
+(`TASK_MASTER_COMPLETED_TASK_RETENTION_DAYS`), then a clean-up job deletes
+them together with their steps, postponements and plan slots. Open tasks are
+never deleted. Run it once a day from cron, Windows Task Scheduler or your
+platform's scheduler:
+
+```bash
+uv run python -m task_master.cleanup
+```

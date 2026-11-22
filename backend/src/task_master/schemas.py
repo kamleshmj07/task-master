@@ -119,6 +119,14 @@ class TaskUpdate(PatchModel):
     status: TaskStatus | None = None
 
 
+class TaskCounts(BaseModel):
+    """Task totals per view, so clients can page without losing counts."""
+
+    scheduled: int
+    someday: int
+    done: int
+
+
 class StepCreate(BaseModel):
     """A step added to the end of a task."""
 
