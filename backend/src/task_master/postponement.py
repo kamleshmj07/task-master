@@ -12,8 +12,6 @@ blocked also gets a prompt to reflect on the real reason.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 from task_master.models import PostponeReason
 
@@ -74,8 +72,3 @@ def suggest(reason: PostponeReason, blocked_count: int) -> Suggestion:
         return suggestion
     reflection = BLOCKED_REFLECTION.format(count=blocked_count)
     return Suggestion(suggestion.headline, suggestion.actions, reflection)
-
-
-def local_today(timezone: str, now: datetime) -> date:
-    """The calendar date at `now` in the user's IANA `timezone`."""
-    return now.astimezone(ZoneInfo(timezone)).date()

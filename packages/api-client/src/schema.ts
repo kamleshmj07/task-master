@@ -259,13 +259,15 @@ export interface paths {
         };
         /**
          * Handle List Tasks
-         * @description List tasks, soonest due first (undated last), with optional filters.
+         * @description List tasks, soonest due first (Someday last), with optional filters.
+         *
+         *     `someday=true` lists only undated tasks; `someday=false` only dated ones.
          */
         get: operations["handle_list_tasks_tasks_get"];
         put?: never;
         /**
          * Handle Create Task
-         * @description Create a task under one of the user's goals.
+         * @description Create a task, optionally under one of the user's goals.
          */
         post: operations["handle_create_task_tasks_post"];
         delete?: never;
@@ -313,7 +315,7 @@ export interface paths {
         put?: never;
         /**
          * Handle Postpone Task
-         * @description Move an open task to a later date and get a fix for the reason given.
+         * @description Move an open task later or to Someday; get a fix for the reason given.
          */
         post: operations["handle_postpone_task_tasks__task_id__postpone_post"];
         delete?: never;
@@ -342,6 +344,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/routines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle List Routines
+         * @description List routines by title; `active_on` keeps those running on that day.
+         */
+        get: operations["handle_list_routines_routines_get"];
+        put?: never;
+        /**
+         * Handle Create Routine
+         * @description Create a routine, optionally under one of the user's goals.
+         */
+        post: operations["handle_create_routine_routines_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routines/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle List Due Routines
+         * @description Routines due on `on` (default: today, in the user's timezone).
+         */
+        get: operations["handle_list_due_routines_routines_due_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routines/{routine_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Get Routine
+         * @description Return one routine.
+         */
+        get: operations["handle_get_routine_routines__routine_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Handle Delete Routine
+         * @description Delete a routine and its history.
+         */
+        delete: operations["handle_delete_routine_routines__routine_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Handle Update Routine
+         * @description Change a routine. Switching frequency drops details it no longer uses.
+         */
+        patch: operations["handle_update_routine_routines__routine_id__patch"];
+        trace?: never;
+    };
+    "/routines/{routine_id}/completions/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Handle Tick Routine
+         * @description Tick a routine off for `day`. Ticking twice is harmless.
+         */
+        put: operations["handle_tick_routine_routines__routine_id__completions__day__put"];
+        post?: never;
+        /**
+         * Handle Untick Routine
+         * @description Undo a tick for `day`.
+         */
+        delete: operations["handle_untick_routine_routines__routine_id__completions__day__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{plan_date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Get Plan
+         * @description The day's Top 3 and routines, with planned minutes against capacity.
+         */
+        get: operations["handle_get_plan_plans__plan_date__get"];
+        /**
+         * Handle Set Plan
+         * @description Replace the day's Top 3 with `task_ids`, most important first.
+         *
+         *     Only open tasks can join the Top 3; tasks finished while already in it
+         *     may stay. Past days cannot be re-planned.
+         */
+        put: operations["handle_set_plan_plans__plan_date__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -358,7 +483,7 @@ export interface components {
              * @default bearer
              * @constant
              */
-            token_type: "bearer";
+            token_type?: "bearer";
             /** Expires In */
             expires_in: number;
         };
@@ -377,7 +502,7 @@ export interface components {
              * Scope
              * @default
              */
-            scope: string;
+            scope?: string;
             /** Client Id */
             client_id?: string | null;
             /**
@@ -401,7 +526,7 @@ export interface components {
              * Scope
              * @default
              */
-            scope: string;
+            scope?: string;
             /** Client Id */
             client_id?: string | null;
             /**
@@ -409,6 +534,29 @@ export interface components {
              * Format: password
              */
             client_secret?: string | null;
+        };
+        /**
+         * Capacity
+         * @description Planned minutes against the user's daily capacity.
+         */
+        Capacity: {
+            /** Limit Minutes */
+            limit_minutes: number;
+            /** Planned Minutes */
+            planned_minutes: number;
+            /** Over */
+            over: boolean;
+        };
+        /**
+         * DueRoutine
+         * @description A routine due on a given day, with whether it was ticked off.
+         */
+        DueRoutine: {
+            routine: components["schemas"]["RoutineRead"];
+            /** Done */
+            done: boolean;
+            /** Streak */
+            streak: number;
         };
         /** ErrorModel */
         ErrorModel: {
@@ -493,6 +641,39 @@ export interface components {
             status: "ok";
         };
         /**
+         * PlanItem
+         * @description One ranked Top 3 slot.
+         */
+        PlanItem: {
+            /** Rank */
+            rank: number;
+            task: components["schemas"]["TaskRead"];
+        };
+        /**
+         * PlanRead
+         * @description A day: its Top 3 tasks and, separately, its routines.
+         */
+        PlanRead: {
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /** Top Three */
+            top_three: components["schemas"]["PlanItem"][];
+            /** Routines */
+            routines: components["schemas"]["DueRoutine"][];
+            capacity: components["schemas"]["Capacity"];
+        };
+        /**
+         * PlanUpdate
+         * @description The day's Top 3, most important first.
+         */
+        PlanUpdate: {
+            /** Task Ids */
+            task_ids: string[];
+        };
+        /**
          * PostponeReason
          * @description Root cause of a postponement; each one calls for a different fix.
          * @enum {string}
@@ -500,14 +681,11 @@ export interface components {
         PostponeReason: "stuck" | "dreading" | "blocked" | "other";
         /**
          * PostponeRequest
-         * @description Move a task to a later date, saying why.
+         * @description Move a task to a later date, or to Someday with `to_date: null`.
          */
         PostponeRequest: {
-            /**
-             * To Date
-             * Format: date
-             */
-            to_date: string;
+            /** To Date */
+            to_date: string | null;
             reason: components["schemas"]["PostponeReason"];
             /** Note */
             note?: string | null;
@@ -538,11 +716,8 @@ export interface components {
             task_id: string;
             /** From Date */
             from_date: string | null;
-            /**
-             * To Date
-             * Format: date
-             */
-            to_date: string;
+            /** To Date */
+            to_date: string | null;
             reason: components["schemas"]["PostponeReason"];
             /** Note */
             note: string | null;
@@ -561,6 +736,102 @@ export interface components {
             refresh_token: string;
         };
         /**
+         * RoutineCreate
+         * @description New routine. Weekdays: 0 = Monday ... 6 = Sunday.
+         */
+        RoutineCreate: {
+            frequency: components["schemas"]["RoutineFrequency"];
+            /** Weekdays */
+            weekdays?: number[] | null;
+            /** Day Of Month */
+            day_of_month?: number | null;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Title */
+            title: string;
+            /** Goal Id */
+            goal_id?: string | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+        };
+        /**
+         * RoutineFrequency
+         * @description How often a routine repeats.
+         * @enum {string}
+         */
+        RoutineFrequency: "daily" | "weekly" | "monthly";
+        /**
+         * RoutineRead
+         * @description A routine as returned by the API.
+         */
+        RoutineRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Goal Id */
+            goal_id: string | null;
+            /** Title */
+            title: string;
+            /** Estimate Minutes */
+            estimate_minutes: number | null;
+            frequency: components["schemas"]["RoutineFrequency"];
+            /** Weekdays */
+            weekdays: number[] | null;
+            /** Day Of Month */
+            day_of_month: number | null;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * RoutineUpdate
+         * @description Partial routine update; schedule fields are checked together.
+         */
+        RoutineUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Goal Id */
+            goal_id?: string | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+            frequency?: components["schemas"]["RoutineFrequency"] | null;
+            /** Weekdays */
+            weekdays?: number[] | null;
+            /** Day Of Month */
+            day_of_month?: number | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+        };
+        /**
          * SuggestionRead
          * @description The fix suggested for a postponement.
          */
@@ -574,14 +845,13 @@ export interface components {
         };
         /**
          * TaskCreate
-         * @description New task; every task needs a goal and a concrete next action.
+         * @description New task; it needs a concrete next action and may serve a goal.
+         *
+         *     Leaving out `due_date` puts the task in Someday.
          */
         TaskCreate: {
-            /**
-             * Goal Id
-             * Format: uuid
-             */
-            goal_id: string;
+            /** Goal Id */
+            goal_id?: string | null;
             /** Title */
             title: string;
             /** Next Action */
@@ -601,11 +871,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /**
-             * Goal Id
-             * Format: uuid
-             */
-            goal_id: string;
+            /** Goal Id */
+            goal_id: string | null;
             /** Title */
             title: string;
             /** Next Action */
@@ -665,7 +932,7 @@ export interface components {
              * @default bearer
              * @constant
              */
-            token_type: "bearer";
+            token_type?: "bearer";
             /** Expires In */
             expires_in: number;
             /** Refresh Token */
@@ -687,27 +954,27 @@ export interface components {
              * Is Active
              * @default true
              */
-            is_active: boolean | null;
+            is_active?: boolean | null;
             /**
              * Is Superuser
              * @default false
              */
-            is_superuser: boolean | null;
+            is_superuser?: boolean | null;
             /**
              * Is Verified
              * @default false
              */
-            is_verified: boolean | null;
+            is_verified?: boolean | null;
             /**
              * Timezone
              * @default UTC
              */
-            timezone: string;
+            timezone?: string;
             /**
              * Daily Capacity Minutes
              * @default 480
              */
-            daily_capacity_minutes: number;
+            daily_capacity_minutes?: number;
         };
         /**
          * UserRead
@@ -728,17 +995,17 @@ export interface components {
              * Is Active
              * @default true
              */
-            is_active: boolean;
+            is_active?: boolean;
             /**
              * Is Superuser
              * @default false
              */
-            is_superuser: boolean;
+            is_superuser?: boolean;
             /**
              * Is Verified
              * @default false
              */
-            is_verified: boolean;
+            is_verified?: boolean;
             /** Timezone */
             timezone: string;
             /** Daily Capacity Minutes */
@@ -1447,6 +1714,7 @@ export interface operations {
             query?: {
                 goal_id?: string | null;
                 status?: components["schemas"]["TaskStatus"] | null;
+                someday?: boolean | null;
                 limit?: number;
                 offset?: number;
             };
@@ -1660,6 +1928,324 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PostponementRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_list_routines_routines_get: {
+        parameters: {
+            query?: {
+                active_on?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutineRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_create_routine_routines_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoutineCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_list_due_routines_routines_due_get: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DueRoutine"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_get_routine_routines__routine_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routine_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_delete_routine_routines__routine_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routine_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_update_routine_routines__routine_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routine_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoutineUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_tick_routine_routines__routine_id__completions__day__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routine_id: string;
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_untick_routine_routines__routine_id__completions__day__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routine_id: string;
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_get_plan_plans__plan_date__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_set_plan_plans__plan_date__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_date: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanRead"];
                 };
             };
             /** @description Validation Error */

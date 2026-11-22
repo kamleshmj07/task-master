@@ -24,6 +24,8 @@ MVP_TABLES = {
     "task_postponement",
     "daily_plan",
     "daily_plan_item",
+    "routine",
+    "routine_completion",
 }
 
 
@@ -163,3 +165,34 @@ class TestSimplifyPostponeReasons:
             command.upgrade(alembic_config, "head")
 
         assert reasons == ["unclear", "boring", "blocked"]
+
+
+class TestDefaultGoalBackfill:
+    def test_upgrade_gives_existing_users_the_default_goal(
+        self, migrated_db: str, alembic_config: Config
+    ) -> None:
+        command.downgrade(alembic_config, BEFORE_ROUTINES)
+        try:
+            _run_on_db(migrated_db, _seed_user)
+            command.upgrade(alembic_config, "head")
+            titles = _run_on_db(migrated_db, _seed_goal_titles)
+        finally:
+            _run_on_db(migrated_db, _delete_seed)
+            command.upgrade(alembic_config, "head")
+
+        assert sorted(titles) == ["Essentials", "Seed goal"]
+
+
+BEFORE_ROUTINES = "e04dfba4791d"
+
+
+def _seed_user(connection: Connection) -> None:
+    _seed_task(connection)
+    connection.commit()
+
+
+def _seed_goal_titles(connection: Connection) -> list[str]:
+    rows = connection.execute(
+        text("SELECT title FROM goal WHERE user_id = :id"), {"id": SEED_USER_ID}
+    )
+    return list(rows.scalars())

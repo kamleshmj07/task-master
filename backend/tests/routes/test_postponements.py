@@ -30,7 +30,7 @@ async def postpone(
     headers: Headers,
     task_id: str,
     reason: str = "stuck",
-    to_date: str = LATER,
+    to_date: str | None = LATER,
     **fields: Any,
 ) -> Response:
     """Postpone a task and return the raw response."""
@@ -236,3 +236,63 @@ class TestHistory:
         )
 
         assert response.status_code == 404
+
+
+class TestSomeday:
+    async def test_moves_dated_task_to_someday(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+
+        response = await postpone(
+            api_client, auth_headers, task["id"], "blocked", to_date=None
+        )
+
+        body = response.json()
+        assert (body["task"]["due_date"], body["postponement"]["to_date"]) == (
+            None,
+            None,
+        )
+
+    async def test_counts_as_a_postponement(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+
+        response = await postpone(api_client, auth_headers, task["id"], to_date=None)
+
+        assert response.json()["task"]["postpone_count"] == 1
+
+    async def test_still_needs_a_reason(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+
+        response = await api_client.post(
+            f"/tasks/{task['id']}/postpone",
+            json={"to_date": None},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+
+    async def test_rejects_task_already_in_someday(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers, due_date=None)
+
+        response = await postpone(api_client, auth_headers, task["id"], to_date=None)
+
+        assert response.status_code == 422
+
+    async def test_someday_task_can_be_scheduled_again(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+        await postpone(api_client, auth_headers, task["id"], to_date=None)
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}", json={"due_date": LATEST}, headers=auth_headers
+        )
+
+        assert response.json()["due_date"] == LATEST

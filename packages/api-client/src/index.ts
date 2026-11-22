@@ -3,9 +3,21 @@ import createClient, { type Middleware } from 'openapi-fetch'
 import type { components, paths } from './schema'
 
 export type { components, paths }
-export type UserRead = components['schemas']['UserRead']
-export type AccessTokenResponse = components['schemas']['AccessTokenResponse']
-export type TokenPairResponse = components['schemas']['TokenPairResponse']
+type Schemas = components['schemas']
+export type UserRead = Schemas['UserRead']
+export type AccessTokenResponse = Schemas['AccessTokenResponse']
+export type TokenPairResponse = Schemas['TokenPairResponse']
+export type GoalRead = Schemas['GoalRead']
+export type GoalStatus = Schemas['GoalStatus']
+export type TaskRead = Schemas['TaskRead']
+export type TaskCreate = Schemas['TaskCreate']
+export type PostponeReason = Schemas['PostponeReason']
+export type PostponeResponse = Schemas['PostponeResponse']
+export type RoutineRead = Schemas['RoutineRead']
+export type RoutineCreate = Schemas['RoutineCreate']
+export type RoutineFrequency = Schemas['RoutineFrequency']
+export type DueRoutine = Schemas['DueRoutine']
+export type PlanRead = Schemas['PlanRead']
 
 /** How a client reaches the API and finds its current access token. */
 export interface ApiClientOptions {

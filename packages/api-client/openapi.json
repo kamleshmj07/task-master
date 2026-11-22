@@ -935,7 +935,7 @@
           "tasks"
         ],
         "summary": "Handle Create Task",
-        "description": "Create a task under one of the user's goals.",
+        "description": "Create a task, optionally under one of the user's goals.",
         "operationId": "handle_create_task_tasks_post",
         "security": [
           {
@@ -980,7 +980,7 @@
           "tasks"
         ],
         "summary": "Handle List Tasks",
-        "description": "List tasks, soonest due first (undated last), with optional filters.",
+        "description": "List tasks, soonest due first (Someday last), with optional filters.\n\n`someday=true` lists only undated tasks; `someday=false` only dated ones.",
         "operationId": "handle_list_tasks_tasks_get",
         "security": [
           {
@@ -1019,6 +1019,22 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "someday",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Someday"
             }
           },
           {
@@ -1225,7 +1241,7 @@
           "postponements"
         ],
         "summary": "Handle Postpone Task",
-        "description": "Move an open task to a later date and get a fix for the reason given.",
+        "description": "Move an open task later or to Someday; get a fix for the reason given.",
         "operationId": "handle_postpone_task_tasks__task_id__postpone_post",
         "security": [
           {
@@ -1337,6 +1353,548 @@
                     "$ref": "#/components/schemas/PostponementRead"
                   },
                   "title": "Response Handle List Postponements Tasks  Task Id  Postponements Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routines": {
+      "post": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle Create Routine",
+        "description": "Create a routine, optionally under one of the user's goals.",
+        "operationId": "handle_create_routine_routines_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle List Routines",
+        "description": "List routines by title; `active_on` keeps those running on that day.",
+        "operationId": "handle_list_routines_routines_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "active_on",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Active On"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoutineRead"
+                  },
+                  "title": "Response Handle List Routines Routines Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routines/due": {
+      "get": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle List Due Routines",
+        "description": "Routines due on `on` (default: today, in the user's timezone).",
+        "operationId": "handle_list_due_routines_routines_due_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "on",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DueRoutine"
+                  },
+                  "title": "Response Handle List Due Routines Routines Due Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routines/{routine_id}": {
+      "get": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle Get Routine",
+        "description": "Return one routine.",
+        "operationId": "handle_get_routine_routines__routine_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Routine Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle Update Routine",
+        "description": "Change a routine. Switching frequency drops details it no longer uses.",
+        "operationId": "handle_update_routine_routines__routine_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Routine Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle Delete Routine",
+        "description": "Delete a routine and its history.",
+        "operationId": "handle_delete_routine_routines__routine_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Routine Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routines/{routine_id}/completions/{day}": {
+      "put": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle Tick Routine",
+        "description": "Tick a routine off for `day`. Ticking twice is harmless.",
+        "operationId": "handle_tick_routine_routines__routine_id__completions__day__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Routine Id"
+            }
+          },
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "routines"
+        ],
+        "summary": "Handle Untick Routine",
+        "description": "Undo a tick for `day`.",
+        "operationId": "handle_untick_routine_routines__routine_id__completions__day__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Routine Id"
+            }
+          },
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plans/{plan_date}": {
+      "get": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Handle Get Plan",
+        "description": "The day's Top 3 and routines, with planned minutes against capacity.",
+        "operationId": "handle_get_plan_plans__plan_date__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Plan Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Handle Set Plan",
+        "description": "Replace the day's Top 3 with `task_ids`, most important first.\n\nOnly open tasks can join the Top 3; tasks finished while already in it\nmay stay. Past days cannot be re-planned.",
+        "operationId": "handle_set_plan_plans__plan_date__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Plan Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanRead"
                 }
               }
             }
@@ -1499,6 +2057,53 @@
           "password"
         ],
         "title": "Body_handle_web_login_auth_web_login_post"
+      },
+      "Capacity": {
+        "properties": {
+          "limit_minutes": {
+            "type": "integer",
+            "title": "Limit Minutes"
+          },
+          "planned_minutes": {
+            "type": "integer",
+            "title": "Planned Minutes"
+          },
+          "over": {
+            "type": "boolean",
+            "title": "Over"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit_minutes",
+          "planned_minutes",
+          "over"
+        ],
+        "title": "Capacity",
+        "description": "Planned minutes against the user's daily capacity."
+      },
+      "DueRoutine": {
+        "properties": {
+          "routine": {
+            "$ref": "#/components/schemas/RoutineRead"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "streak": {
+            "type": "integer",
+            "title": "Streak"
+          }
+        },
+        "type": "object",
+        "required": [
+          "routine",
+          "done",
+          "streak"
+        ],
+        "title": "DueRoutine",
+        "description": "A routine due on a given day, with whether it was ticked off."
       },
       "ErrorModel": {
         "properties": {
@@ -1716,6 +2321,78 @@
         "title": "HealthResponse",
         "description": "Health check payload."
       },
+      "PlanItem": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "task"
+        ],
+        "title": "PlanItem",
+        "description": "One ranked Top 3 slot."
+      },
+      "PlanRead": {
+        "properties": {
+          "plan_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Plan Date"
+          },
+          "top_three": {
+            "items": {
+              "$ref": "#/components/schemas/PlanItem"
+            },
+            "type": "array",
+            "title": "Top Three"
+          },
+          "routines": {
+            "items": {
+              "$ref": "#/components/schemas/DueRoutine"
+            },
+            "type": "array",
+            "title": "Routines"
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/Capacity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan_date",
+          "top_three",
+          "routines",
+          "capacity"
+        ],
+        "title": "PlanRead",
+        "description": "A day: its Top 3 tasks and, separately, its routines."
+      },
+      "PlanUpdate": {
+        "properties": {
+          "task_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Task Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_ids"
+        ],
+        "title": "PlanUpdate",
+        "description": "The day's Top 3, most important first."
+      },
       "PostponeReason": {
         "type": "string",
         "enum": [
@@ -1730,8 +2407,15 @@
       "PostponeRequest": {
         "properties": {
           "to_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "To Date"
           },
           "reason": {
@@ -1756,7 +2440,7 @@
           "reason"
         ],
         "title": "PostponeRequest",
-        "description": "Move a task to a later date, saying why."
+        "description": "Move a task to a later date, or to Someday with `to_date: null`."
       },
       "PostponeResponse": {
         "properties": {
@@ -1804,8 +2488,15 @@
             "title": "From Date"
           },
           "to_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "To Date"
           },
           "reason": {
@@ -1857,6 +2548,310 @@
         "title": "RefreshRequest",
         "description": "Refresh token sent by mobile clients."
       },
+      "RoutineCreate": {
+        "properties": {
+          "frequency": {
+            "$ref": "#/components/schemas/RoutineFrequency"
+          },
+          "weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer",
+                  "maximum": 6.0,
+                  "minimum": 0.0
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekdays"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 31.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "goal_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frequency",
+          "start_date",
+          "end_date",
+          "title"
+        ],
+        "title": "RoutineCreate",
+        "description": "New routine. Weekdays: 0 = Monday ... 6 = Sunday."
+      },
+      "RoutineFrequency": {
+        "type": "string",
+        "enum": [
+          "daily",
+          "weekly",
+          "monthly"
+        ],
+        "title": "RoutineFrequency",
+        "description": "How often a routine repeats."
+      },
+      "RoutineRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "goal_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/RoutineFrequency"
+          },
+          "weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekdays"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "goal_id",
+          "title",
+          "estimate_minutes",
+          "frequency",
+          "weekdays",
+          "day_of_month",
+          "start_date",
+          "end_date",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoutineRead",
+        "description": "A routine as returned by the API."
+      },
+      "RoutineUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "goal_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          },
+          "frequency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoutineFrequency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer",
+                  "maximum": 6.0,
+                  "minimum": 0.0
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekdays"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 31.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          }
+        },
+        "type": "object",
+        "title": "RoutineUpdate",
+        "description": "Partial routine update; schedule fields are checked together."
+      },
       "SuggestionRead": {
         "properties": {
           "headline": {
@@ -1894,8 +2889,15 @@
       "TaskCreate": {
         "properties": {
           "goal_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Goal Id"
           },
           "title": {
@@ -1938,12 +2940,11 @@
         },
         "type": "object",
         "required": [
-          "goal_id",
           "title",
           "next_action"
         ],
         "title": "TaskCreate",
-        "description": "New task; every task needs a goal and a concrete next action."
+        "description": "New task; it needs a concrete next action and may serve a goal.\n\nLeaving out `due_date` puts the task in Someday."
       },
       "TaskRead": {
         "properties": {
@@ -1953,8 +2954,15 @@
             "title": "Id"
           },
           "goal_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Goal Id"
           },
           "title": {

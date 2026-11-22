@@ -455,3 +455,50 @@ class TestDeleteTask:
         response = await api_client.delete(f"/tasks/{task['id']}", headers=auth_headers)
 
         assert response.status_code == 404
+
+
+class TestGoalLessTasks:
+    async def test_creates_task_without_goal(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        response = await api_client.post(
+            "/tasks",
+            json={"title": "Renew insurance", "next_action": "Call the broker"},
+            headers=auth_headers,
+        )
+
+        assert (response.status_code, response.json()["goal_id"]) == (201, None)
+
+    async def test_detaches_task_from_its_goal(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await create_task(
+            api_client, auth_headers, await goal_id_for(api_client, auth_headers)
+        )
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}", json={"goal_id": None}, headers=auth_headers
+        )
+
+        assert response.json()["goal_id"] is None
+
+    async def test_filters_someday_tasks(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal_id = await goal_id_for(api_client, auth_headers)
+        await create_task(api_client, auth_headers, goal_id, title="Undated")
+        await create_task(
+            api_client, auth_headers, goal_id, title="Dated", due_date="2099-01-01"
+        )
+
+        someday = await api_client.get(
+            "/tasks", params={"someday": True}, headers=auth_headers
+        )
+        dated = await api_client.get(
+            "/tasks", params={"someday": False}, headers=auth_headers
+        )
+
+        assert (
+            [t["title"] for t in someday.json()],
+            [t["title"] for t in dated.json()],
+        ) == (["Undated"], ["Dated"])

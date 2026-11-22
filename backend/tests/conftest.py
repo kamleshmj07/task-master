@@ -1,6 +1,7 @@
 """Shared test fixtures."""
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -14,10 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.config import Settings
 from task_master.database import create_engine
-from task_master.dependencies import get_session
+from task_master.dependencies import get_now, get_session
 from task_master.main import create_app
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
+# API tests run at this moment, so "today" is always 2026-11-22 in UTC.
+FIXED_NOW = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
 
 
 class DatabaseTestSettings(BaseSettings):
@@ -113,6 +116,7 @@ async def api_client(
 
     app = create_app(settings)
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_now] = lambda: FIXED_NOW
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="https://test") as client:
         yield client

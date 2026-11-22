@@ -1,22 +1,21 @@
 """Postponing tasks: record why, move the date, and suggest a fix."""
 
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select, update
 
 from task_master.auth.users import CurrentUserDep
-from task_master.dependencies import SessionDep
+from task_master.dependencies import NowDep, SessionDep, local_today
 from task_master.models import (
     PostponeReason,
     Task,
     TaskPostponement,
     TaskStatus,
-    User,
-    utc_now,
 )
-from task_master.postponement import local_today, suggest
+from task_master.postponement import suggest
 from task_master.queries import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, get_owned_or_404
 from task_master.schemas import (
     PostponementRead,
@@ -35,10 +34,11 @@ async def handle_postpone_task(
     body: PostponeRequest,
     user: CurrentUserDep,
     session: SessionDep,
+    now: NowDep,
 ) -> PostponeResponse:
-    """Move an open task to a later date and get a fix for the reason given."""
+    """Move an open task later or to Someday; get a fix for the reason given."""
     task = await get_owned_or_404(session, Task, task_id, user.id)
-    _check_postponable(task, body, user)
+    _check_postponable(task, body, local_today(user.timezone, now))
     postponement = TaskPostponement(
         task_id=task.id,
         from_date=task.due_date,
@@ -77,7 +77,11 @@ async def handle_list_postponements(
     statement = (
         select(TaskPostponement)
         .where(TaskPostponement.task_id == task_id)
-        .order_by(TaskPostponement.to_date, TaskPostponement.id)
+        .order_by(
+            TaskPostponement.created_at,
+            TaskPostponement.to_date.asc().nulls_last(),
+            TaskPostponement.id,
+        )
         .limit(limit)
         .offset(offset)
     )
@@ -85,23 +89,27 @@ async def handle_list_postponements(
     return [PostponementRead.model_validate(row) for row in rows]
 
 
-def _check_postponable(task: Task, body: PostponeRequest, user: User) -> None:
-    """Refuse finished tasks and dates that do not move the task forward."""
+def _check_postponable(task: Task, body: PostponeRequest, today: date) -> None:
+    """Refuse finished tasks and moves that do not push the task back."""
     if task.status is TaskStatus.DONE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A finished task cannot be postponed",
         )
-    if body.to_date < local_today(user.timezone, utc_now()):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Cannot postpone into the past",
-        )
+    if body.to_date is None:
+        if task.due_date is None:
+            raise _unprocessable("The task is already in Someday")
+        return
+    if body.to_date < today:
+        raise _unprocessable("Cannot postpone into the past")
     if task.due_date is not None and body.to_date <= task.due_date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="The new date must be after the current due date",
-        )
+        raise _unprocessable("The new date must be after the current due date")
+
+
+def _unprocessable(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail
+    )
 
 
 async def _count_blocked(session: SessionDep, task_id: uuid.UUID) -> int:

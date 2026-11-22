@@ -5,8 +5,9 @@ from datetime import UTC, date, datetime
 import pytest
 from pydantic import ValidationError
 
+from task_master.dependencies import local_today
 from task_master.models import PostponeReason
-from task_master.postponement import SUGGESTIONS, local_today, suggest
+from task_master.postponement import SUGGESTIONS, suggest
 from task_master.schemas import PostponeRequest
 
 FUTURE = date(2099, 1, 1)

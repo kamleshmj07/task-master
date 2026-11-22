@@ -6,13 +6,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from task_master.models import Goal, Task
+from task_master.models import Goal, Routine, Task
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
 
-async def get_owned_or_404[M: (Goal, Task)](
+async def get_owned_or_404[M: (Goal, Routine, Task)](
     session: AsyncSession, model: type[M], id: uuid.UUID, user_id: uuid.UUID
 ) -> M:
     """Return the row with `id` owned by `user_id`.

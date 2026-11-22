@@ -21,8 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.auth.db import AccessTokenDatabase, UserDatabase
 from task_master.auth.tokens import revoke_user_sessions
+from task_master.defaults import DEFAULT_GOAL_TITLE, DEFAULT_GOAL_WHY
 from task_master.dependencies import SessionDep, SettingsDep
-from task_master.models import User
+from task_master.models import Goal, User
 
 MIN_PASSWORD_LENGTH = 12
 MAX_PASSWORD_LENGTH = 128
@@ -55,6 +56,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             raise InvalidPasswordException(
                 reason="Password must not contain your email"
             )
+
+    async def on_after_register(
+        self, user: User, request: Request | None = None
+    ) -> None:
+        """Start every account with the default goal."""
+        self.session.add(
+            Goal(user_id=user.id, title=DEFAULT_GOAL_TITLE, why=DEFAULT_GOAL_WHY)
+        )
+        await self.session.commit()
 
     async def on_after_update(
         self,

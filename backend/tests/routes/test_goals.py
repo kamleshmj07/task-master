@@ -6,6 +6,8 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
+from task_master.defaults import DEFAULT_GOAL_TITLE
+
 pytestmark = [pytest.mark.anyio, pytest.mark.db]
 
 Headers = dict[str, str]
@@ -19,6 +21,30 @@ async def create_goal(
     response = await client.post("/goals", json={**GOAL, **fields}, headers=headers)
     assert response.status_code == 201
     return response.json()
+
+
+async def default_goal_id(client: AsyncClient, headers: Headers) -> str:
+    """Id of the goal every account starts with."""
+    goals = (await client.get("/goals", headers=headers)).json()
+    return next(g["id"] for g in goals if g["title"] == DEFAULT_GOAL_TITLE)
+
+
+class TestDefaultGoal:
+    async def test_new_account_starts_with_essentials(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        response = await api_client.get("/goals", headers=auth_headers)
+
+        assert [goal["title"] for goal in response.json()] == [DEFAULT_GOAL_TITLE]
+
+    async def test_default_goal_is_an_ordinary_goal(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal_id = await default_goal_id(api_client, auth_headers)
+
+        response = await api_client.delete(f"/goals/{goal_id}", headers=auth_headers)
+
+        assert response.status_code == 204
 
 
 class TestCreateGoal:
@@ -83,7 +109,8 @@ class TestListGoals:
 
         response = await api_client.get("/goals", headers=auth_headers)
 
-        assert [goal["id"] for goal in response.json()] == [mine["id"]]
+        ids = {goal["id"] for goal in response.json()}
+        assert ids == {mine["id"], await default_goal_id(api_client, auth_headers)}
 
     async def test_filters_by_status(
         self, api_client: AsyncClient, auth_headers: Headers

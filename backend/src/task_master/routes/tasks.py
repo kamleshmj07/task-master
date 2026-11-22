@@ -19,8 +19,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 async def handle_create_task(
     body: TaskCreate, user: CurrentUserDep, session: SessionDep
 ) -> TaskRead:
-    """Create a task under one of the user's goals."""
-    await get_owned_or_404(session, Goal, body.goal_id, user.id)
+    """Create a task, optionally under one of the user's goals."""
+    if body.goal_id is not None:
+        await get_owned_or_404(session, Goal, body.goal_id, user.id)
     task = Task(user_id=user.id, **body.model_dump())
     session.add(task)
     await session.commit()
@@ -34,15 +35,22 @@ async def handle_list_tasks(
     session: SessionDep,
     goal_id: uuid.UUID | None = None,
     task_status: Annotated[TaskStatus | None, Query(alias="status")] = None,
+    someday: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[TaskRead]:
-    """List tasks, soonest due first (undated last), with optional filters."""
+    """List tasks, soonest due first (Someday last), with optional filters.
+
+    `someday=true` lists only undated tasks; `someday=false` only dated ones.
+    """
     statement = select(Task).where(Task.user_id == user.id)
     if goal_id is not None:
         statement = statement.where(Task.goal_id == goal_id)
     if task_status is not None:
         statement = statement.where(Task.status == task_status)
+    if someday is not None:
+        undated = Task.due_date.is_(None)
+        statement = statement.where(undated if someday else ~undated)
     order = (Task.due_date.asc().nulls_last(), Task.created_at, Task.id)
     statement = statement.order_by(*order).limit(limit).offset(offset)
     return [TaskRead.model_validate(task) for task in await session.scalars(statement)]
@@ -65,7 +73,7 @@ async def handle_update_task(
     task = await get_owned_or_404(session, Task, task_id, user.id)
     changes = body.changes()
     _refuse_hidden_postponement(task, changes)
-    if "goal_id" in changes:
+    if changes.get("goal_id") is not None:
         await get_owned_or_404(session, Goal, changes["goal_id"], user.id)
     for field, value in _with_completion(task, changes).items():
         setattr(task, field, value)
@@ -96,6 +104,8 @@ def _with_completion(task: Task, changes: dict[str, Any]) -> dict[str, Any]:
 def _refuse_hidden_postponement(task: Task, changes: dict[str, Any]) -> None:
     """Send later or cleared due dates through `POST /tasks/{id}/postpone`.
 
+    Clearing a date moves the task to Someday, which is a postponement too.
+
     Pushing a date back is a postponement: it must record a reason and count
     towards `postpone_count`. Scheduling an undated task, or bringing a date
     forward, is a plain edit.
@@ -108,7 +118,6 @@ def _refuse_hidden_postponement(task: Task, changes: dict[str, Any]) -> None:
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail=(
-            "Use POST /tasks/{task_id}/postpone to move a due date later; "
-            "a due date cannot be cleared"
+            "Use POST /tasks/{task_id}/postpone to move a due date later or to Someday"
         ),
     )

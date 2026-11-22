@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    ARRAY,
     CheckConstraint,
     Date,
     DateTime,
@@ -36,6 +37,14 @@ class GoalStatus(StrEnum):
     ACTIVE = "active"
     COMPLETED = "completed"
     ARCHIVED = "archived"
+
+
+class RoutineFrequency(StrEnum):
+    """How often a routine repeats."""
+
+    DAILY = "daily"
+    WEEKLY = "weekly"  # on the chosen `weekdays`
+    MONTHLY = "monthly"  # on `day_of_month`, or the month's last day if shorter
 
 
 class TaskStatus(StrEnum):
@@ -180,11 +189,15 @@ class Goal(TimestampMixin, Base):
 
 
 class Task(TimestampMixin, Base):
-    """A unit of work toward a goal, always with a concrete next action."""
+    """A unit of work with a concrete next action, optionally toward a goal.
+
+    A task with no due date sits in the Someday bucket.
+    """
 
     __tablename__ = "task"
     __table_args__ = (
-        # Composite FK guarantees a task's owner is its goal's owner.
+        # Composite FK guarantees a task's owner is its goal's owner. It is
+        # not checked when `goal_id` is NULL, so goal-less tasks are allowed.
         ForeignKeyConstraint(
             ["goal_id", "user_id"],
             ["goal.id", "goal.user_id"],
@@ -200,7 +213,7 @@ class Task(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), index=True
     )
-    goal_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     title: Mapped[str] = mapped_column(String(200))
     next_action: Mapped[str] = mapped_column(String(500))
     estimate_minutes: Mapped[int | None]
@@ -218,7 +231,8 @@ class TaskPostponement(Base):
     __tablename__ = "task_postponement"
     __table_args__ = (
         CheckConstraint(
-            "from_date IS NULL OR to_date > from_date", name="moves_forward"
+            "from_date IS NULL OR to_date IS NULL OR to_date > from_date",
+            name="moves_forward",
         ),
         CheckConstraint(
             "reason <> 'other' OR length(trim(coalesce(note, ''))) > 0",
@@ -231,7 +245,8 @@ class TaskPostponement(Base):
         ForeignKey("task.id", ondelete="CASCADE"), index=True
     )
     from_date: Mapped[date | None] = mapped_column(Date)
-    to_date: Mapped[date] = mapped_column(Date)
+    # NULL means the task was moved to Someday.
+    to_date: Mapped[date | None] = mapped_column(Date)
     reason: Mapped[PostponeReason] = mapped_column(_enum_column(PostponeReason))
     note: Mapped[str | None] = mapped_column(String(POSTPONE_NOTE_MAX_LENGTH))
     created_at: Mapped[datetime] = mapped_column(
@@ -279,3 +294,64 @@ class DailyPlanItem(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[uuid.UUID]
     rank: Mapped[int] = mapped_column(SmallInteger)
+
+
+class Routine(TimestampMixin, Base):
+    """A recurring item, ticked off on each day it is due.
+
+    Unlike tasks, routines are never postponed and never enter the Top 3:
+    a missed day simply stays unticked.
+    """
+
+    __tablename__ = "routine"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["goal_id", "user_id"],
+            ["goal.id", "goal.user_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("id", "user_id"),
+        CheckConstraint("end_date >= start_date", name="ends_after_start"),
+        CheckConstraint("estimate_minutes > 0", name="estimate_positive"),
+        CheckConstraint(
+            "(frequency = 'weekly') = (weekdays IS NOT NULL)", name="weekly_has_days"
+        ),
+        CheckConstraint(
+            "weekdays IS NULL OR (cardinality(weekdays) > 0"
+            " AND weekdays <@ ARRAY[0, 1, 2, 3, 4, 5, 6]::smallint[])",
+            name="weekdays_valid",
+        ),
+        CheckConstraint(
+            "(frequency = 'monthly') = (day_of_month IS NOT NULL)",
+            name="monthly_has_day",
+        ),
+        CheckConstraint("day_of_month BETWEEN 1 AND 31", name="day_of_month_range"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    estimate_minutes: Mapped[int | None]
+    frequency: Mapped[RoutineFrequency] = mapped_column(_enum_column(RoutineFrequency))
+    # ISO weekday numbers minus one: 0 = Monday ... 6 = Sunday.
+    weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
+    day_of_month: Mapped[int | None] = mapped_column(SmallInteger)
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)
+
+
+class RoutineCompletion(Base):
+    """A routine ticked off on one day."""
+
+    __tablename__ = "routine_completion"
+
+    routine_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("routine.id", ondelete="CASCADE"), primary_key=True
+    )
+    completed_on: Mapped[date] = mapped_column(Date, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

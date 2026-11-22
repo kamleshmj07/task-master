@@ -1,4 +1,4 @@
-"""Request and response schemas for goals, tasks and postponements."""
+"""Request and response schemas for goals, tasks, routines and plans."""
 
 import uuid
 from datetime import date, datetime
@@ -10,6 +10,7 @@ from task_master.models import (
     POSTPONE_NOTE_MAX_LENGTH,
     GoalStatus,
     PostponeReason,
+    RoutineFrequency,
     TaskStatus,
 )
 
@@ -82,9 +83,12 @@ class GoalRead(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    """New task; every task needs a goal and a concrete next action."""
+    """New task; it needs a concrete next action and may serve a goal.
 
-    goal_id: uuid.UUID
+    Leaving out `due_date` puts the task in Someday.
+    """
+
+    goal_id: uuid.UUID | None = None
     title: Title
     next_action: NextAction
     estimate_minutes: EstimateMinutes | None = None
@@ -94,7 +98,7 @@ class TaskCreate(BaseModel):
 class TaskUpdate(PatchModel):
     """Partial task update. Setting `status` maintains `completed_at`."""
 
-    REQUIRED_IF_SET = frozenset({"goal_id", "title", "next_action", "status"})
+    REQUIRED_IF_SET = frozenset({"title", "next_action", "status"})
 
     goal_id: uuid.UUID | None = None
     title: Title | None = None
@@ -110,7 +114,7 @@ class TaskRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    goal_id: uuid.UUID
+    goal_id: uuid.UUID | None
     title: str
     next_action: str
     estimate_minutes: int | None
@@ -128,9 +132,9 @@ PostponeNote = Annotated[
 
 
 class PostponeRequest(BaseModel):
-    """Move a task to a later date, saying why."""
+    """Move a task to a later date, or to Someday with `to_date: null`."""
 
-    to_date: date
+    to_date: date | None
     reason: PostponeReason
     note: PostponeNote | None = None
 
@@ -152,7 +156,7 @@ class PostponementRead(BaseModel):
     id: uuid.UUID
     task_id: uuid.UUID
     from_date: date | None
-    to_date: date
+    to_date: date | None
     reason: PostponeReason
     note: str | None
     created_at: datetime
@@ -174,3 +178,125 @@ class PostponeResponse(BaseModel):
     task: TaskRead
     postponement: PostponementRead
     suggestion: SuggestionRead
+
+
+Weekday = Annotated[int, Field(ge=0, le=6)]
+DayOfMonth = Annotated[int, Field(ge=1, le=31)]
+
+
+class RoutineSchedule(BaseModel):
+    """When a routine is due. Shared by create and update payloads."""
+
+    frequency: RoutineFrequency
+    weekdays: list[Weekday] | None = None
+    day_of_month: DayOfMonth | None = None
+    start_date: date
+    end_date: date
+
+    @model_validator(mode="after")
+    def check_schedule(self) -> Self:
+        """Each frequency takes exactly the detail it needs."""
+        check_schedule(self.frequency, self.weekdays, self.day_of_month)
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        if self.weekdays is not None:
+            self.weekdays = sorted(set(self.weekdays))
+        return self
+
+
+def check_schedule(
+    frequency: RoutineFrequency, weekdays: list[int] | None, day: int | None
+) -> None:
+    """Raise `ValueError` unless the schedule fields match `frequency`."""
+    weekly = frequency is RoutineFrequency.WEEKLY
+    monthly = frequency is RoutineFrequency.MONTHLY
+    if weekly != bool(weekdays):
+        raise ValueError("weekdays are required for weekly routines, and only them")
+    if monthly != (day is not None):
+        raise ValueError("day_of_month is required for monthly routines, and only them")
+
+
+class RoutineCreate(RoutineSchedule):
+    """New routine. Weekdays: 0 = Monday ... 6 = Sunday."""
+
+    title: Title
+    goal_id: uuid.UUID | None = None
+    estimate_minutes: EstimateMinutes | None = None
+
+
+class RoutineUpdate(PatchModel):
+    """Partial routine update; schedule fields are checked together."""
+
+    REQUIRED_IF_SET = frozenset({"title", "frequency", "start_date", "end_date"})
+
+    title: Title | None = None
+    goal_id: uuid.UUID | None = None
+    estimate_minutes: EstimateMinutes | None = None
+    frequency: RoutineFrequency | None = None
+    weekdays: list[Weekday] | None = None
+    day_of_month: DayOfMonth | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class RoutineRead(BaseModel):
+    """A routine as returned by the API."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    goal_id: uuid.UUID | None
+    title: str
+    estimate_minutes: int | None
+    frequency: RoutineFrequency
+    weekdays: list[int] | None
+    day_of_month: int | None
+    start_date: date
+    end_date: date
+    created_at: datetime
+    updated_at: datetime
+
+
+class DueRoutine(BaseModel):
+    """A routine due on a given day, with whether it was ticked off."""
+
+    routine: RoutineRead
+    done: bool
+    streak: int
+
+
+class PlanUpdate(BaseModel):
+    """The day's Top 3, most important first."""
+
+    task_ids: list[uuid.UUID] = Field(max_length=3)
+
+    @model_validator(mode="after")
+    def reject_duplicates(self) -> Self:
+        """A task can hold only one slot."""
+        if len(set(self.task_ids)) != len(self.task_ids):
+            raise ValueError("A task can appear only once in the Top 3")
+        return self
+
+
+class PlanItem(BaseModel):
+    """One ranked Top 3 slot."""
+
+    rank: int
+    task: TaskRead
+
+
+class Capacity(BaseModel):
+    """Planned minutes against the user's daily capacity."""
+
+    limit_minutes: int
+    planned_minutes: int
+    over: bool
+
+
+class PlanRead(BaseModel):
+    """A day: its Top 3 tasks and, separately, its routines."""
+
+    plan_date: date
+    top_three: list[PlanItem]
+    routines: list[DueRoutine]
+    capacity: Capacity
