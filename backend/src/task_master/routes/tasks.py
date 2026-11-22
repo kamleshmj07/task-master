@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from task_master.auth.users import CurrentUserDep
@@ -64,6 +64,7 @@ async def handle_update_task(
     """Change a task; moving it requires owning the destination goal."""
     task = await get_owned_or_404(session, Task, task_id, user.id)
     changes = body.changes()
+    _refuse_hidden_postponement(task, changes)
     if "goal_id" in changes:
         await get_owned_or_404(session, Goal, changes["goal_id"], user.id)
     for field, value in _with_completion(task, changes).items():
@@ -90,3 +91,24 @@ def _with_completion(task: Task, changes: dict[str, Any]) -> dict[str, Any]:
         return changes
     completed_at = utc_now() if new_status == TaskStatus.DONE else None
     return {**changes, "completed_at": completed_at}
+
+
+def _refuse_hidden_postponement(task: Task, changes: dict[str, Any]) -> None:
+    """Send later or cleared due dates through `POST /tasks/{id}/postpone`.
+
+    Pushing a date back is a postponement: it must record a reason and count
+    towards `postpone_count`. Scheduling an undated task, or bringing a date
+    forward, is a plain edit.
+    """
+    if "due_date" not in changes or task.due_date is None:
+        return
+    new_date = changes["due_date"]
+    if new_date is not None and new_date <= task.due_date:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            "Use POST /tasks/{task_id}/postpone to move a due date later; "
+            "a due date cannot be cleared"
+        ),
+    )

@@ -327,6 +327,100 @@ class TestUpdateTask:
         assert response.status_code == 404
 
 
+class TestDueDateEdits:
+    async def test_schedules_an_undated_task(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await create_task(
+            api_client, auth_headers, await goal_id_for(api_client, auth_headers)
+        )
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}",
+            json={"due_date": "2099-01-10"},
+            headers=auth_headers,
+        )
+
+        assert response.json()["due_date"] == "2099-01-10"
+
+    async def test_brings_a_date_forward(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await create_task(
+            api_client,
+            auth_headers,
+            await goal_id_for(api_client, auth_headers),
+            due_date="2099-01-10",
+        )
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}",
+            json={"due_date": "2099-01-05"},
+            headers=auth_headers,
+        )
+
+        assert response.json()["due_date"] == "2099-01-05"
+
+    async def test_keeps_the_same_date(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await create_task(
+            api_client,
+            auth_headers,
+            await goal_id_for(api_client, auth_headers),
+            due_date="2099-01-10",
+        )
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}",
+            json={"due_date": "2099-01-10"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+
+    @pytest.mark.parametrize("due_date", ["2099-01-11", None])
+    async def test_refuses_to_push_back_or_clear_a_date(
+        self, api_client: AsyncClient, auth_headers: Headers, due_date: str | None
+    ) -> None:
+        task = await create_task(
+            api_client,
+            auth_headers,
+            await goal_id_for(api_client, auth_headers),
+            due_date="2099-01-10",
+        )
+
+        response = await api_client.patch(
+            f"/tasks/{task['id']}", json={"due_date": due_date}, headers=auth_headers
+        )
+
+        assert response.status_code == 409
+
+    async def test_refused_edit_changes_nothing(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await create_task(
+            api_client,
+            auth_headers,
+            await goal_id_for(api_client, auth_headers),
+            due_date="2099-01-10",
+        )
+        url = f"/tasks/{task['id']}"
+        await api_client.patch(
+            url,
+            json={"due_date": "2099-02-01", "title": "Sneaky"},
+            headers=auth_headers,
+        )
+
+        stored = (await api_client.get(url, headers=auth_headers)).json()
+
+        assert (stored["due_date"], stored["title"], stored["postpone_count"]) == (
+            "2099-01-10",
+            task["title"],
+            0,
+        )
+
+
 class TestDeleteTask:
     async def test_deletes_task(
         self, api_client: AsyncClient, auth_headers: Headers
