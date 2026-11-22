@@ -27,6 +27,7 @@ MVP_TABLES = {
     "routine",
     "routine_completion",
     "task_step",
+    "notification",
 }
 
 

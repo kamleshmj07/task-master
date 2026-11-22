@@ -214,3 +214,66 @@ class TestDeleteStep:
         response = await api_client.delete(step_url(task, 0), headers=auth_headers)
 
         assert response.status_code == 404
+
+
+class TestReorderSteps:
+    async def test_puts_steps_in_the_given_order(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers, ["One", "Two", "Three"])
+        ids = [step["id"] for step in task["steps"]]
+
+        response = await api_client.put(
+            f"/tasks/{task['id']}/steps/order",
+            json={"step_ids": [ids[2], ids[0], ids[1]]},
+            headers=auth_headers,
+        )
+
+        assert [s["text"] for s in response.json()["steps"]] == ["Three", "One", "Two"]
+
+    async def test_next_step_follows_the_new_order(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers, ["One", "Two"])
+        ids = [step["id"] for step in task["steps"]]
+
+        response = await api_client.put(
+            f"/tasks/{task['id']}/steps/order",
+            json={"step_ids": [ids[1], ids[0]]},
+            headers=auth_headers,
+        )
+
+        assert response.json()["next_step"] == "Two"
+
+    @pytest.mark.parametrize("pick", ["missing", "duplicate", "foreign"])
+    async def test_requires_every_step_exactly_once(
+        self, api_client: AsyncClient, auth_headers: Headers, pick: str
+    ) -> None:
+        task = await new_task(api_client, auth_headers, ["One", "Two"])
+        ids = [step["id"] for step in task["steps"]]
+        step_ids = {
+            "missing": [ids[0]],
+            "duplicate": [ids[0], ids[0]],
+            "foreign": [ids[0], str(uuid.uuid4())],
+        }[pick]
+
+        response = await api_client.put(
+            f"/tasks/{task['id']}/steps/order",
+            json={"step_ids": step_ids},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+
+    async def test_cannot_reorder_other_users_steps(
+        self, api_client: AsyncClient, auth_headers: Headers, other_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, other_headers)
+
+        response = await api_client.put(
+            f"/tasks/{task['id']}/steps/order",
+            json={"step_ids": [s["id"] for s in task["steps"]]},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 404

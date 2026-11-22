@@ -1,16 +1,23 @@
 """Task endpoints. Every route acts only on the current user's tasks."""
 
 import uuid
+from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import Select, func, select
+from sqlalchemy import ColumnElement, Select, and_, exists, func, or_, select
 
 from task_master.auth.users import CurrentUserDep
-from task_master.dependencies import SessionDep
+from task_master.dependencies import NowDep, SessionDep, local_today
 from task_master.models import Goal, Task, TaskStatus, TaskStep, utc_now
 from task_master.queries import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, get_owned_or_404
-from task_master.schemas import TaskCounts, TaskCreate, TaskRead, TaskUpdate
+from task_master.schemas import (
+    TaskCounts,
+    TaskCreate,
+    TaskRead,
+    TaskUpdate,
+    TaskView,
+)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -40,6 +47,8 @@ async def handle_create_task(
 async def handle_list_tasks(
     user: CurrentUserDep,
     session: SessionDep,
+    now: NowDep,
+    view: TaskView | None = None,
     goal_id: uuid.UUID | None = None,
     no_goal: bool = False,
     task_status: Annotated[TaskStatus | None, Query(alias="status")] = None,
@@ -49,19 +58,24 @@ async def handle_list_tasks(
 ) -> list[TaskRead]:
     """List tasks a page at a time, with optional filters.
 
-    Open tasks come soonest due first (Someday last); finished ones most
-    recently completed first. `someday=true` lists only undated tasks,
-    `someday=false` only dated ones; `no_goal=true` only goal-less ones.
+    `view` picks one Tasks-page view (see `TaskView`). Open tasks come
+    soonest due first (Someday last); finished ones most recently completed
+    first. `someday=true` lists only undated tasks, `someday=false` only
+    dated ones; `no_goal=true` only goal-less ones.
     """
     statement = _owned_tasks(user.id, goal_id, no_goal)
+    if view is not None:
+        conditions = _view_conditions(local_today(user.timezone, now))
+        statement = statement.where(conditions[view])
     if task_status is not None:
         statement = statement.where(Task.status == task_status)
     if someday is not None:
         undated = Task.due_date.is_(None)
         statement = statement.where(undated if someday else ~undated)
+    finished = view is TaskView.DONE or task_status is TaskStatus.DONE
     order = (
         (Task.completed_at.desc().nulls_last(), Task.id)
-        if task_status is TaskStatus.DONE
+        if finished
         else (Task.due_date.asc().nulls_last(), Task.created_at, Task.id)
     )
     statement = statement.order_by(*order).limit(limit).offset(offset)
@@ -72,22 +86,20 @@ async def handle_list_tasks(
 async def handle_count_tasks(
     user: CurrentUserDep,
     session: SessionDep,
+    now: NowDep,
     goal_id: uuid.UUID | None = None,
     no_goal: bool = False,
 ) -> TaskCounts:
-    """How many tasks are Scheduled, in Someday and Done, for the same filters."""
-    tasks = _owned_tasks(user.id, goal_id, no_goal).subquery()
-    is_open = tasks.c.status == TaskStatus.TODO
-    row = (
-        await session.execute(
-            select(
-                func.count().filter(is_open, tasks.c.due_date.is_not(None)),
-                func.count().filter(is_open, tasks.c.due_date.is_(None)),
-                func.count().filter(tasks.c.status == TaskStatus.DONE),
-            )
-        )
-    ).one()
-    return TaskCounts(scheduled=row[0], someday=row[1], done=row[2])
+    """How many tasks are in each view, for the same goal filters."""
+    conditions = _view_conditions(local_today(user.timezone, now))
+    owned = _owned_tasks(user.id, goal_id, no_goal).subquery()
+    counts = (
+        select(*(func.count().filter(conditions[view]) for view in TaskView))
+        .select_from(Task)
+        .where(Task.id.in_(select(owned.c.id)))
+    )
+    row = (await session.execute(counts)).one()
+    return TaskCounts(**{view.value: row[i] for i, view in enumerate(TaskView)})
 
 
 @router.get("/{task_id}")
@@ -136,6 +148,23 @@ def _owned_tasks(
     if goal_id is not None:
         return statement.where(Task.goal_id == goal_id)
     return statement
+
+
+def _view_conditions(today: date) -> dict[TaskView, ColumnElement[bool]]:
+    """SQL conditions placing each task in exactly one Tasks-page view."""
+    is_open = Task.status == TaskStatus.TODO
+    all_steps_done = ~exists().where(
+        TaskStep.task_id == Task.id, TaskStep.done_at.is_(None)
+    )
+    # Guard the NULL due date: `NULL < today` is NULL, which `~` cannot negate.
+    overdue = and_(Task.due_date.is_not(None), Task.due_date < today)
+    needs_review = or_(all_steps_done, overdue)
+    return {
+        TaskView.REVIEW: and_(is_open, needs_review),
+        TaskView.SCHEDULED: and_(is_open, ~needs_review, Task.due_date.is_not(None)),
+        TaskView.SOMEDAY: and_(is_open, ~needs_review, Task.due_date.is_(None)),
+        TaskView.DONE: Task.status == TaskStatus.DONE,
+    }
 
 
 def _with_completion(task: Task, changes: dict[str, Any]) -> dict[str, Any]:

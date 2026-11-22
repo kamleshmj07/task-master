@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date, datetime
+from enum import StrEnum
 from typing import Annotated, Any, ClassVar, Self
 
 from pydantic import (
@@ -16,6 +17,7 @@ from pydantic import (
 from task_master.models import (
     POSTPONE_NOTE_MAX_LENGTH,
     GoalStatus,
+    Notification,
     PostponeReason,
     RoutineFrequency,
     TaskStatus,
@@ -119,12 +121,34 @@ class TaskUpdate(PatchModel):
     status: TaskStatus | None = None
 
 
+class TaskView(StrEnum):
+    """Where a task appears on the Tasks page; each task is in exactly one.
+
+    - review: open, and either every step is done or the due date has passed
+    - scheduled: open, dated today or later, with steps left
+    - someday: open, undated, with steps left
+    - done: completed
+    """
+
+    SCHEDULED = "scheduled"
+    REVIEW = "review"
+    SOMEDAY = "someday"
+    DONE = "done"
+
+
 class TaskCounts(BaseModel):
     """Task totals per view, so clients can page without losing counts."""
 
     scheduled: int
+    review: int
     someday: int
     done: int
+
+
+class StepOrder(BaseModel):
+    """Every step of a task, by id, in the new order."""
+
+    step_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_STEPS)
 
 
 class StepCreate(BaseModel):
@@ -231,6 +255,41 @@ class SuggestionRead(BaseModel):
     headline: str
     actions: list[str]
     reflection: str | None
+
+
+class NotificationRead(BaseModel):
+    """A saved tip about a postponed task."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    task_id: uuid.UUID | None
+    task_title: str
+    reason: PostponeReason
+    headline: str
+    actions: list[str]
+    reflection: str | None
+    created_at: datetime
+    read: bool
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_read(cls, data: Any) -> Any:
+        """A stored notification is read once it has a `read_at` time."""
+        if isinstance(data, Notification):
+            return {
+                **{
+                    key: getattr(data, key) for key in cls.model_fields if key != "read"
+                },
+                "read": data.read_at is not None,
+            }
+        return data
+
+
+class UnreadCount(BaseModel):
+    """How many notifications are still unread."""
+
+    unread: int
 
 
 class PostponeResponse(BaseModel):

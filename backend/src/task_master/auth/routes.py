@@ -30,6 +30,7 @@ from task_master.auth.lockout import LoginThrottle
 from task_master.auth.rate_limit import enforce_auth_rate_limit
 from task_master.auth.schemas import (
     AccessTokenResponse,
+    DeleteAccountRequest,
     RefreshRequest,
     TokenPairResponse,
 )
@@ -40,6 +41,7 @@ from task_master.auth.tokens import (
     rotate_refresh_token,
 )
 from task_master.auth.users import (
+    CurrentUserDep,
     CurrentUserTokenDep,
     StrategyDep,
     UserManagerDep,
@@ -57,6 +59,7 @@ CredentialsDep = Annotated[OAuth2PasswordRequestForm, Depends()]
 RateLimitDep = Depends(enforce_auth_rate_limit)
 
 web_router = APIRouter(prefix=WEB_PREFIX, tags=["auth: web"])
+account_router = APIRouter(prefix="/users", tags=["users"])
 mobile_router = APIRouter(prefix="/auth/mobile", tags=["auth: mobile"])
 
 
@@ -241,3 +244,32 @@ async def handle_mobile_logout(
     user, access_token = user_token
     await strategy.destroy_token(access_token, user)
     await revoke_refresh_token(session, user.id, body.refresh_token)
+
+
+@account_router.delete(
+    "/me", status_code=status.HTTP_204_NO_CONTENT, dependencies=[RateLimitDep]
+)
+async def handle_delete_account(
+    body: DeleteAccountRequest,
+    response: Response,
+    user: CurrentUserDep,
+    users: UserManagerDep,
+) -> None:
+    """Delete the account and everything it owns, after re-checking the password.
+
+    Goals, tasks, steps, postponements, routines, plans, notifications and
+    every session go with it; the web refresh cookie is cleared.
+    """
+    verified, _ = users.password_helper.verify_and_update(
+        body.password, user.hashed_password
+    )
+    if not verified:
+        logger.warning("Account deletion refused: wrong password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Password is incorrect"
+        )
+    await users.delete(user)
+    logger.info("Account deleted")
+    response.delete_cookie(
+        REFRESH_COOKIE, path=WEB_PREFIX, secure=True, httponly=True, samesite="strict"
+    )

@@ -2,7 +2,7 @@
 
 Finished tasks stay visible under Done for `completed_task_retention_days`
 (default 90) and are then deleted with their steps, postponements and plan
-slots. Run it on a schedule, e.g. daily:
+slots. Read notifications older than that go too. Run it on a schedule, e.g. daily:
 
     uv run python -m task_master.cleanup
 """
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.config import get_settings
 from task_master.database import create_engine, create_session_factory
-from task_master.models import Task, TaskStatus, utc_now
+from task_master.models import Notification, Task, TaskStatus, utc_now
 
 
 async def purge_completed_tasks(session: AsyncSession, cutoff: datetime) -> int:
@@ -31,6 +31,18 @@ async def purge_completed_tasks(session: AsyncSession, cutoff: datetime) -> int:
     return deleted
 
 
+async def purge_read_notifications(session: AsyncSession, cutoff: datetime) -> int:
+    """Delete read notifications created before `cutoff`; return how many went."""
+    result = await session.execute(
+        delete(Notification)
+        .where(Notification.read_at.is_not(None), Notification.created_at < cutoff)
+        .returning(Notification.id)
+    )
+    deleted = len(result.all())
+    await session.commit()
+    return deleted
+
+
 async def run(now: datetime) -> int:
     """Purge with the configured retention period against the app database."""
     settings = get_settings()
@@ -38,6 +50,7 @@ async def run(now: datetime) -> int:
     try:
         async with create_session_factory(engine)() as session:
             cutoff = now - timedelta(days=settings.completed_task_retention_days)
+            await purge_read_notifications(session, cutoff)
             return await purge_completed_tasks(session, cutoff)
     finally:
         await engine.dispose()

@@ -387,6 +387,44 @@
           }
         ]
       },
+      "delete": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Handle Delete Account",
+        "description": "Delete the account and everything it owns, after re-checking the password.\n\nGoals, tasks, steps, postponements, routines, plans, notifications and\nevery session go with it; the web refresh cookie is cleared.",
+        "operationId": "handle_delete_account_users_me_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
       "patch": {
         "tags": [
           "users"
@@ -980,7 +1018,7 @@
           "tasks"
         ],
         "summary": "Handle List Tasks",
-        "description": "List tasks a page at a time, with optional filters.\n\nOpen tasks come soonest due first (Someday last); finished ones most\nrecently completed first. `someday=true` lists only undated tasks,\n`someday=false` only dated ones; `no_goal=true` only goal-less ones.",
+        "description": "List tasks a page at a time, with optional filters.\n\n`view` picks one Tasks-page view (see `TaskView`). Open tasks come\nsoonest due first (Someday last); finished ones most recently completed\nfirst. `someday=true` lists only undated tasks, `someday=false` only\ndated ones; `no_goal=true` only goal-less ones.",
         "operationId": "handle_list_tasks_tasks_get",
         "security": [
           {
@@ -988,6 +1026,22 @@
           }
         ],
         "parameters": [
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TaskView"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "View"
+            }
+          },
           {
             "name": "goal_id",
             "in": "query",
@@ -1105,7 +1159,7 @@
           "tasks"
         ],
         "summary": "Handle Count Tasks",
-        "description": "How many tasks are Scheduled, in Someday and Done, for the same filters.",
+        "description": "How many tasks are in each view, for the same goal filters.",
         "operationId": "handle_count_tasks_tasks_counts_get",
         "security": [
           {
@@ -1348,6 +1402,65 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/steps/order": {
+      "put": {
+        "tags": [
+          "steps"
+        ],
+        "summary": "Handle Reorder Steps",
+        "description": "Put the task's steps in the given order; every step must be listed once.",
+        "operationId": "handle_reorder_steps_tasks__task_id__steps_order_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -2172,6 +2285,185 @@
           }
         }
       }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Handle List Notifications",
+        "description": "The user's notifications, newest first.",
+        "operationId": "handle_list_notifications_notifications_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Unread Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationRead"
+                  },
+                  "title": "Response Handle List Notifications Notifications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Handle Count Unread",
+        "description": "How many notifications are unread, for the bell's badge.",
+        "operationId": "handle_count_unread_notifications_unread_count_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Handle Mark Read",
+        "description": "Mark one notification as read. Marking it again changes nothing.",
+        "operationId": "handle_mark_read_notifications__notification_id__read_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Handle Mark All Read",
+        "description": "Mark every unread notification as read.",
+        "operationId": "handle_mark_all_read_notifications_read_all_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2318,6 +2610,22 @@
           "password"
         ],
         "title": "Body_handle_web_login_auth_web_login_post"
+      },
+      "DeleteAccountRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "DeleteAccountRequest",
+        "description": "The current password, so a stolen session cannot delete the account."
       },
       "DueRoutine": {
         "properties": {
@@ -2557,6 +2865,79 @@
         ],
         "title": "HealthResponse",
         "description": "Health check payload."
+      },
+      "NotificationRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_title": {
+            "type": "string",
+            "title": "Task Title"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PostponeReason"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "reflection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reflection"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_id",
+          "task_title",
+          "reason",
+          "headline",
+          "actions",
+          "reflection",
+          "created_at",
+          "read"
+        ],
+        "title": "NotificationRead",
+        "description": "A saved tip about a postponed task."
       },
       "PlanItem": {
         "properties": {
@@ -3063,6 +3444,26 @@
         "title": "StepCreate",
         "description": "A step added to the end of a task."
       },
+      "StepOrder": {
+        "properties": {
+          "step_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Step Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step_ids"
+        ],
+        "title": "StepOrder",
+        "description": "Every step of a task, by id, in the new order."
+      },
       "StepRead": {
         "properties": {
           "id": {
@@ -3159,6 +3560,10 @@
             "type": "integer",
             "title": "Scheduled"
           },
+          "review": {
+            "type": "integer",
+            "title": "Review"
+          },
           "someday": {
             "type": "integer",
             "title": "Someday"
@@ -3171,6 +3576,7 @@
         "type": "object",
         "required": [
           "scheduled",
+          "review",
           "someday",
           "done"
         ],
@@ -3432,6 +3838,17 @@
         "title": "TaskUpdate",
         "description": "Partial task update. Setting `status` maintains `completed_at`.\n\nSteps change through the task's `/steps` routes."
       },
+      "TaskView": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "review",
+          "someday",
+          "done"
+        ],
+        "title": "TaskView",
+        "description": "Where a task appears on the Tasks page; each task is in exactly one.\n\n- review: open, and either every step is done or the due date has passed\n- scheduled: open, dated today or later, with steps left\n- someday: open, undated, with steps left\n- done: completed"
+      },
       "TokenPairResponse": {
         "properties": {
           "access_token": {
@@ -3461,6 +3878,20 @@
         ],
         "title": "TokenPairResponse",
         "description": "Access and refresh tokens for mobile clients, which store both."
+      },
+      "UnreadCount": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread"
+        ],
+        "title": "UnreadCount",
+        "description": "How many notifications are still unread."
       },
       "UserCreate": {
         "properties": {
@@ -3513,6 +3944,19 @@
             "type": "string",
             "title": "Timezone",
             "default": "UTC"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           }
         },
         "type": "object",
@@ -3553,13 +3997,25 @@
           "timezone": {
             "type": "string",
             "title": "Timezone"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           }
         },
         "type": "object",
         "required": [
           "id",
           "email",
-          "timezone"
+          "timezone",
+          "display_name"
         ],
         "title": "UserRead",
         "description": "Public view of an account."
@@ -3632,6 +4088,19 @@
               }
             ],
             "title": "Timezone"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           }
         },
         "type": "object",

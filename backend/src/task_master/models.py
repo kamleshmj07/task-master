@@ -120,6 +120,8 @@ class User(TimestampMixin, Base):
         is_superuser: Mapped[bool] = mapped_column(default=False)
         is_verified: Mapped[bool] = mapped_column(default=False)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    # Asked for on first sign-in; NULL until the user has told us.
+    display_name: Mapped[str | None] = mapped_column(String(100))
 
 
 def utc_now() -> datetime:
@@ -369,3 +371,30 @@ class RoutineCompletion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class Notification(Base):
+    """Something worth coming back to, shown under the bell until read.
+
+    For now these are the fixes suggested when a task is postponed.
+    """
+
+    __tablename__ = "notification"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    # The task it is about; kept (unlinked) if the task is later deleted.
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("task.id", ondelete="SET NULL"), index=True
+    )
+    task_title: Mapped[str] = mapped_column(String(200))
+    reason: Mapped[PostponeReason] = mapped_column(_enum_column(PostponeReason))
+    headline: Mapped[str] = mapped_column(String(200))
+    actions: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    reflection: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

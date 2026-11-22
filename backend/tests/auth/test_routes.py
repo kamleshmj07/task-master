@@ -4,11 +4,18 @@ from http.cookies import SimpleCookie
 
 import pytest
 from httpx import AsyncClient, Response
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.auth.routes import REFRESH_COOKIE
-from task_master.models import User
+from task_master.models import (
+    Goal,
+    Notification,
+    RefreshToken,
+    Task,
+    TaskStep,
+    User,
+)
 
 pytestmark = [pytest.mark.anyio, pytest.mark.db]
 
@@ -71,6 +78,7 @@ class TestRegister:
             "is_superuser",
             "is_verified",
             "timezone",
+            "display_name",
         }
 
     async def test_ignores_superuser_flag(self, api_client: AsyncClient) -> None:
@@ -397,3 +405,127 @@ class TestCurrentUser:
         )
 
         assert response.status_code == 403
+
+
+class TestDisplayName:
+    async def test_starts_empty(self, api_client: AsyncClient) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        me = await api_client.get("/users/me", headers=_bearer(access_token))
+
+        assert me.json()["display_name"] is None
+
+    async def test_can_be_set_and_is_trimmed(self, api_client: AsyncClient) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        response = await api_client.patch(
+            "/users/me",
+            json={"display_name": "  Ada Lovelace "},
+            headers=_bearer(access_token),
+        )
+
+        assert response.json()["display_name"] == "Ada Lovelace"
+
+    @pytest.mark.parametrize("name", ["   ", "x" * 101])
+    async def test_rejects_blank_or_long_names(
+        self, api_client: AsyncClient, name: str
+    ) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        response = await api_client.patch(
+            "/users/me", json={"display_name": name}, headers=_bearer(access_token)
+        )
+
+        assert response.status_code == 422
+
+
+class TestDeleteAccount:
+    async def _delete(
+        self, client: AsyncClient, token: str, password: str = PASSWORD
+    ) -> Response:
+        return await client.request(
+            "DELETE",
+            "/users/me",
+            json={"password": password},
+            headers=_bearer(token),
+        )
+
+    async def test_deletes_the_account_and_everything_it_owns(
+        self, api_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        access_token, _ = await _mobile_session(api_client)
+        headers = _bearer(access_token)
+        task = await api_client.post(
+            "/tasks",
+            json={"title": "T", "steps": ["s"], "due_date": "2099-01-01"},
+            headers=headers,
+        )
+        await api_client.post(
+            f"/tasks/{task.json()['id']}/postpone",
+            json={"to_date": "2099-01-02", "reason": "stuck"},
+            headers=headers,
+        )
+
+        response = await self._delete(api_client, access_token)
+
+        remaining = {
+            model.__tablename__: await db_session.scalar(
+                select(func.count()).select_from(model)
+            )
+            for model in (User, Goal, Task, TaskStep, Notification, RefreshToken)
+        }
+        assert response.status_code == 204
+        assert set(remaining.values()) == {0}
+
+    async def test_signs_the_user_out(self, api_client: AsyncClient) -> None:
+        access_token, refresh_token = await _mobile_session(api_client)
+
+        await self._delete(api_client, access_token)
+
+        me = await api_client.get("/users/me", headers=_bearer(access_token))
+        refreshed = await api_client.post(
+            "/auth/mobile/refresh", json={"refresh_token": refresh_token}
+        )
+        assert (me.status_code, refreshed.status_code) == (401, 401)
+
+    async def test_clears_the_web_refresh_cookie(self, api_client: AsyncClient) -> None:
+        access_token, _ = await _web_session(api_client)
+
+        response = await self._delete(api_client, access_token)
+
+        assert REFRESH_COOKIE in response.headers["set-cookie"]
+        assert REFRESH_COOKIE not in api_client.cookies
+
+    async def test_refuses_a_wrong_password(self, api_client: AsyncClient) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        response = await self._delete(api_client, access_token, "not-my-password")
+
+        me = await api_client.get("/users/me", headers=_bearer(access_token))
+        assert (response.status_code, me.status_code) == (400, 200)
+
+    async def test_requires_a_password(self, api_client: AsyncClient) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        response = await api_client.request(
+            "DELETE", "/users/me", json={}, headers=_bearer(access_token)
+        )
+
+        assert response.status_code == 422
+
+    async def test_requires_authentication(self, api_client: AsyncClient) -> None:
+        response = await api_client.request(
+            "DELETE", "/users/me", json={"password": PASSWORD}
+        )
+
+        assert response.status_code == 401
+
+    async def test_leaves_other_accounts_alone(
+        self, api_client: AsyncClient, other_headers: dict[str, str]
+    ) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        await self._delete(api_client, access_token)
+
+        me = await api_client.get("/users/me", headers=other_headers)
+        assert me.status_code == 200

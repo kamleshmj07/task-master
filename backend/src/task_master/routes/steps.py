@@ -9,7 +9,13 @@ from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import NowDep, SessionDep
 from task_master.models import Task, TaskStep
 from task_master.queries import get_owned_or_404
-from task_master.schemas import MAX_STEPS, StepCreate, StepUpdate, TaskRead
+from task_master.schemas import (
+    MAX_STEPS,
+    StepCreate,
+    StepOrder,
+    StepUpdate,
+    TaskRead,
+)
 
 router = APIRouter(prefix="/tasks/{task_id}/steps", tags=["steps"])
 
@@ -27,6 +33,23 @@ async def handle_add_step(
     )
     task.steps.append(TaskStep(position=(last or 0) + 1, text=body.text))
     return await _saved(session, task)
+
+
+@router.put("/order")
+async def handle_reorder_steps(
+    task_id: uuid.UUID, body: StepOrder, user: CurrentUserDep, session: SessionDep
+) -> TaskRead:
+    """Put the task's steps in the given order; every step must be listed once."""
+    task = await get_owned_or_404(session, Task, task_id, user.id)
+    by_id = {step.id: step for step in task.steps}
+    if len(body.step_ids) != len(by_id) or set(body.step_ids) != set(by_id):
+        raise _unprocessable("List every step of the task exactly once")
+    for position, step_id in enumerate(body.step_ids):
+        by_id[step_id].position = position
+    await session.commit()
+    session.expire(task, ["steps"])
+    await session.refresh(task)
+    return TaskRead.model_validate(task)
 
 
 @router.patch("/{step_id}")

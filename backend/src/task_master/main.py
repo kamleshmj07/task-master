@@ -16,6 +16,7 @@ from task_master.database import create_engine, create_session_factory
 from task_master.routes import (
     goals,
     health,
+    notifications,
     plans,
     postponements,
     routines,
@@ -78,6 +79,8 @@ def _include_routers(app: FastAPI) -> None:
     )
     app.include_router(auth_routes.web_router)
     app.include_router(auth_routes.mobile_router)
+    # Before the fastapi-users router, whose `/users/{id}` would claim "me".
+    app.include_router(auth_routes.account_router)
     app.include_router(
         fastapi_users.get_users_router(UserRead, UserUpdate),
         prefix="/users",
@@ -89,3 +92,4 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(postponements.router)
     app.include_router(routines.router)
     app.include_router(plans.router)
+    app.include_router(notifications.router)

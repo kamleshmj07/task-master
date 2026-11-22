@@ -172,7 +172,14 @@ export interface paths {
         get: operations["users_current_user_users_me_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Handle Delete Account
+         * @description Delete the account and everything it owns, after re-checking the password.
+         *
+         *     Goals, tasks, steps, postponements, routines, plans, notifications and
+         *     every session go with it; the web refresh cookie is cleared.
+         */
+        delete: operations["handle_delete_account_users_me_delete"];
         options?: never;
         head?: never;
         /** Users:Patch Current User */
@@ -261,9 +268,10 @@ export interface paths {
          * Handle List Tasks
          * @description List tasks a page at a time, with optional filters.
          *
-         *     Open tasks come soonest due first (Someday last); finished ones most
-         *     recently completed first. `someday=true` lists only undated tasks,
-         *     `someday=false` only dated ones; `no_goal=true` only goal-less ones.
+         *     `view` picks one Tasks-page view (see `TaskView`). Open tasks come
+         *     soonest due first (Someday last); finished ones most recently completed
+         *     first. `someday=true` lists only undated tasks, `someday=false` only
+         *     dated ones; `no_goal=true` only goal-less ones.
          */
         get: operations["handle_list_tasks_tasks_get"];
         put?: never;
@@ -287,7 +295,7 @@ export interface paths {
         };
         /**
          * Handle Count Tasks
-         * @description How many tasks are Scheduled, in Someday and Done, for the same filters.
+         * @description How many tasks are in each view, for the same goal filters.
          */
         get: operations["handle_count_tasks_tasks_counts_get"];
         put?: never;
@@ -340,6 +348,26 @@ export interface paths {
          * @description Add a step to the end of a task.
          */
         post: operations["handle_add_step_tasks__task_id__steps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/steps/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Handle Reorder Steps
+         * @description Put the task's steps in the given order; every step must be listed once.
+         */
+        put: operations["handle_reorder_steps_tasks__task_id__steps_order_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -533,6 +561,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle List Notifications
+         * @description The user's notifications, newest first.
+         */
+        get: operations["handle_list_notifications_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Count Unread
+         * @description How many notifications are unread, for the bell's badge.
+         */
+        get: operations["handle_count_unread_notifications_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Mark Read
+         * @description Mark one notification as read. Marking it again changes nothing.
+         */
+        post: operations["handle_mark_read_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Mark All Read
+         * @description Mark every unread notification as read.
+         */
+        post: operations["handle_mark_all_read_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -600,6 +708,14 @@ export interface components {
              * Format: password
              */
             client_secret?: string | null;
+        };
+        /**
+         * DeleteAccountRequest
+         * @description The current password, so a stolen session cannot delete the account.
+         */
+        DeleteAccountRequest: {
+            /** Password */
+            password: string;
         };
         /**
          * DueRoutine
@@ -693,6 +809,35 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * NotificationRead
+         * @description A saved tip about a postponed task.
+         */
+        NotificationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Task Title */
+            task_title: string;
+            reason: components["schemas"]["PostponeReason"];
+            /** Headline */
+            headline: string;
+            /** Actions */
+            actions: string[];
+            /** Reflection */
+            reflection: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Read */
+            read: boolean;
         };
         /**
          * PlanItem
@@ -887,6 +1032,14 @@ export interface components {
             text: string;
         };
         /**
+         * StepOrder
+         * @description Every step of a task, by id, in the new order.
+         */
+        StepOrder: {
+            /** Step Ids */
+            step_ids: string[];
+        };
+        /**
          * StepRead
          * @description One step of a task.
          */
@@ -930,6 +1083,8 @@ export interface components {
         TaskCounts: {
             /** Scheduled */
             scheduled: number;
+            /** Review */
+            review: number;
             /** Someday */
             someday: number;
             /** Done */
@@ -1020,6 +1175,17 @@ export interface components {
             status?: components["schemas"]["TaskStatus"] | null;
         };
         /**
+         * TaskView
+         * @description Where a task appears on the Tasks page; each task is in exactly one.
+         *
+         *     - review: open, and either every step is done or the due date has passed
+         *     - scheduled: open, dated today or later, with steps left
+         *     - someday: open, undated, with steps left
+         *     - done: completed
+         * @enum {string}
+         */
+        TaskView: "scheduled" | "review" | "someday" | "done";
+        /**
          * TokenPairResponse
          * @description Access and refresh tokens for mobile clients, which store both.
          */
@@ -1036,6 +1202,14 @@ export interface components {
             expires_in: number;
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * UnreadCount
+         * @description How many notifications are still unread.
+         */
+        UnreadCount: {
+            /** Unread */
+            unread: number;
         };
         /**
          * UserCreate
@@ -1069,6 +1243,8 @@ export interface components {
              * @default UTC
              */
             timezone?: string;
+            /** Display Name */
+            display_name?: string | null;
         };
         /**
          * UserRead
@@ -1102,6 +1278,8 @@ export interface components {
             is_verified?: boolean;
             /** Timezone */
             timezone: string;
+            /** Display Name */
+            display_name: string | null;
         };
         /**
          * UserUpdate
@@ -1120,6 +1298,8 @@ export interface components {
             is_verified?: boolean | null;
             /** Timezone */
             timezone?: string | null;
+            /** Display Name */
+            display_name?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1419,6 +1599,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    handle_delete_account_users_me_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
@@ -1802,6 +2013,7 @@ export interface operations {
     handle_list_tasks_tasks_get: {
         parameters: {
             query?: {
+                view?: components["schemas"]["TaskView"] | null;
                 goal_id?: string | null;
                 no_goal?: boolean;
                 status?: components["schemas"]["TaskStatus"] | null;
@@ -2012,6 +2224,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_reorder_steps_tasks__task_id__steps_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2481,6 +2728,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_list_notifications_notifications_get: {
+        parameters: {
+            query?: {
+                unread_only?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_count_unread_notifications_unread_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCount"];
+                };
+            };
+        };
+    };
+    handle_mark_read_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_mark_all_read_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCount"];
                 };
             };
         };

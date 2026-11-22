@@ -536,7 +536,12 @@ class TestCountsAndPaging:
 
         response = await api_client.get("/tasks/counts", headers=auth_headers)
 
-        assert response.json() == {"scheduled": 1, "someday": 1, "done": 1}
+        assert response.json() == {
+            "scheduled": 1,
+            "review": 0,
+            "someday": 1,
+            "done": 1,
+        }
 
     async def test_counts_only_own_tasks(
         self, api_client: AsyncClient, auth_headers: Headers, other_headers: Headers
@@ -547,7 +552,12 @@ class TestCountsAndPaging:
 
         response = await api_client.get("/tasks/counts", headers=auth_headers)
 
-        assert response.json() == {"scheduled": 0, "someday": 0, "done": 0}
+        assert response.json() == {
+            "scheduled": 0,
+            "review": 0,
+            "someday": 0,
+            "done": 0,
+        }
 
     async def test_counts_follow_the_goal_filters(
         self, api_client: AsyncClient, auth_headers: Headers
@@ -612,3 +622,79 @@ class TestCountsAndPaging:
         )
 
         assert (len(first.json()), len(rest.json())) == (50, 1)
+
+
+class TestReviewView:
+    """Pinned today is 2026-11-22."""
+
+    async def create(
+        self, client: AsyncClient, headers: Headers, title: str, **fields: Any
+    ) -> dict[str, Any]:
+        response = await client.post(
+            "/tasks",
+            json={"title": title, "steps": ["Only"], **fields},
+            headers=headers,
+        )
+        return response.json()
+
+    async def titles(
+        self, client: AsyncClient, headers: Headers, view: str
+    ) -> list[str]:
+        response = await client.get("/tasks", params={"view": view}, headers=headers)
+        return [task["title"] for task in response.json()]
+
+    async def test_overdue_tasks_move_to_review(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        await self.create(api_client, auth_headers, "Late", due_date="2026-11-21")
+        await self.create(api_client, auth_headers, "Today", due_date="2026-11-22")
+
+        review = await self.titles(api_client, auth_headers, "review")
+        scheduled = await self.titles(api_client, auth_headers, "scheduled")
+
+        assert (review, scheduled) == (["Late"], ["Today"])
+
+    async def test_tasks_with_every_step_done_move_to_review(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await self.create(api_client, auth_headers, "Ready")
+        step_id = task["steps"][0]["id"]
+        await api_client.patch(
+            f"/tasks/{task['id']}/steps/{step_id}",
+            json={"done": True},
+            headers=auth_headers,
+        )
+
+        review = await self.titles(api_client, auth_headers, "review")
+        someday = await self.titles(api_client, auth_headers, "someday")
+
+        assert (review, someday) == (["Ready"], [])
+
+    async def test_each_task_is_in_exactly_one_view(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        await self.create(api_client, auth_headers, "Late", due_date="2026-11-01")
+        await self.create(api_client, auth_headers, "Soon", due_date="2026-11-25")
+        await self.create(api_client, auth_headers, "Undated")
+        done = await self.create(api_client, auth_headers, "Finished")
+        await api_client.patch(
+            f"/tasks/{done['id']}", json={"status": "done"}, headers=auth_headers
+        )
+
+        response = await api_client.get("/tasks/counts", headers=auth_headers)
+
+        assert response.json() == {
+            "scheduled": 1,
+            "review": 1,
+            "someday": 1,
+            "done": 1,
+        }
+
+    async def test_rejects_unknown_view(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        response = await api_client.get(
+            "/tasks", params={"view": "later"}, headers=auth_headers
+        )
+
+        assert response.status_code == 422

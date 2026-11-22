@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master import cleanup
-from task_master.cleanup import purge_completed_tasks
-from task_master.models import Goal, Task, TaskStatus
+from task_master.cleanup import purge_completed_tasks, purge_read_notifications
+from task_master.models import Goal, Notification, PostponeReason, Task, TaskStatus
 from tests.factories import make_goal, make_task, make_user
 
 NOW = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
@@ -72,3 +72,37 @@ class TestMain:
 
         assert cleanup.main() == 0
         assert "Deleted 3 finished task(s)" in capsys.readouterr().out
+
+
+@pytest.mark.anyio
+@pytest.mark.db
+class TestPurgeReadNotifications:
+    async def notification(
+        self, session: AsyncSession, created_at: datetime, read: bool
+    ) -> Notification:
+        user = await make_user(session)
+        notification = Notification(
+            user_id=user.id,
+            task_title="Tax",
+            reason=PostponeReason.STUCK,
+            headline="Make the first step smaller",
+            actions=["Split it"],
+            created_at=created_at,
+            read_at=created_at if read else None,
+        )
+        session.add(notification)
+        await session.flush()
+        return notification
+
+    async def test_deletes_old_read_notifications(
+        self, db_session: AsyncSession
+    ) -> None:
+        await self.notification(db_session, CUTOFF - timedelta(days=1), read=True)
+
+        assert await purge_read_notifications(db_session, CUTOFF) == 1
+
+    async def test_keeps_unread_and_recent_ones(self, db_session: AsyncSession) -> None:
+        await self.notification(db_session, CUTOFF - timedelta(days=1), read=False)
+        await self.notification(db_session, CUTOFF + timedelta(days=1), read=True)
+
+        assert await purge_read_notifications(db_session, CUTOFF) == 0
