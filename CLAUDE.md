@@ -51,6 +51,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   `smoke-test@example.com`. Re-seed with
   `cd backend && uv run python -m tests.seed.seed_load_more`.
 - Clean-up job (not yet scheduled anywhere): `uv run python -m task_master.cleanup`.
+- Stopping the web dev server's `npm run dev` leaves Vite's `node` child
+  listening on 5173. After stopping it, check the port and end that
+  `vite.js` process by PID.
 
 ## Domain rules (decided with the user)
 
@@ -128,15 +131,20 @@ artifact (artboard "Tasks page – Desk lamp direction").
 
 ## Status (2026-11-23)
 
-- Branch `feature/auth-and-tooling`, pushed to GitHub, 16 commits ahead of
-  `master` at `3681955`. **No pull request yet, so CI has never run.**
+- `master` has everything so far: PR #1 (`feature/auth-and-tooling`) merged
+  at `1b21d97` after the first CI run passed (backend, frontend,
+  api-contract).
+- Active branch: **`feature/tasks-page`**, for Tasks page work only. Other
+  pages get their own branches when needed. Each branch reaches `master`
+  through a PR.
+- `ArthurClune` is not a collaborator on `kamleshmj07/task-master`, so
+  GitHub cannot add them as a reviewer until they are invited.
 - Dev database migrated to `c2e193cd6125` (head).
 - Tests: 383 backend (98% coverage), 99 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
-1. Open a PR into `master` (reviewer `ArthurClune`) so CI runs; then use one
-   short-lived branch per page or feature.
+1. Continue the Tasks page on `feature/tasks-page`; open a PR when a batch is done.
 2. User testing of the redesigned Tasks page, notifications and Settings.
 3. Redesign the remaining pages, mockup first: Today, Routines, Goals.
 4. Schedule the clean-up job daily.

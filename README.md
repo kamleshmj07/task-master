@@ -89,9 +89,9 @@ npm run generate:api
 ## Branches
 
 `master` is the stable line. Work happens on a feature branch and reaches
-`master` through a pull request, which is where CI runs. Development so far
-is on `feature/auth-and-tooling`; from here on, the plan is one short-lived
-branch per page or feature (e.g. `feature/today-page`).
+`master` through a pull request, which is where CI runs. The first round of
+work was merged in PR #1; from here on there is one branch per page or
+feature (e.g. `feature/tasks-page`, `feature/today-page`).
 
 ## CI
 
