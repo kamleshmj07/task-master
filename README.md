@@ -33,6 +33,20 @@ npm run dev -w @task-master/web
 npm run android -w @task-master/mobile
 ```
 
+### Run the app locally
+
+In three terminals, from the repo root:
+
+```bash
+docker compose up -d db                                  # Postgres
+cd backend && uv run alembic upgrade head && uv run uvicorn task_master.main:create_app --factory --reload
+npm run dev -w @task-master/web                          # http://localhost:5173
+```
+
+Open **http://localhost:5173**, not `127.0.0.1`: the refresh cookie needs the
+web app and API (`http://localhost:8000`) on the same site. API docs are at
+http://localhost:8000/docs.
+
 After changing API routes or schemas, regenerate the client types and commit
 the result (CI fails if they are stale):
 
