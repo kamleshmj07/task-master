@@ -1,10 +1,12 @@
 """SQLAlchemy ORM models for the MVP domain."""
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    ARRAY,
     CheckConstraint,
     Date,
     DateTime,
@@ -18,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -37,6 +39,14 @@ class GoalStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class RoutineFrequency(StrEnum):
+    """How often a routine repeats."""
+
+    DAILY = "daily"
+    WEEKLY = "weekly"  # on the chosen `weekdays`
+    MONTHLY = "monthly"  # on `day_of_month`, or the month's last day if shorter
+
+
 class TaskStatus(StrEnum):
     """Lifecycle of a task."""
 
@@ -45,18 +55,19 @@ class TaskStatus(StrEnum):
 
 
 class PostponeReason(StrEnum):
-    """Why a task was postponed; drives the suggested fix."""
+    """Root cause of a postponement; each one calls for a different fix."""
 
-    UNCLEAR = "unclear"
-    TOO_BIG = "too_big"
-    BORING = "boring"
-    ANXIOUS = "anxious"
-    BLOCKED = "blocked"
-    NO_TIME = "no_time"
+    STUCK = "stuck"  # "I don't know where to start"
+    DREADING = "dreading"  # "I don't want to do it"
+    BLOCKED = "blocked"  # "Something's in the way"
+    OTHER = "other"  # Free text in `note`
+
+
+POSTPONE_NOTE_MAX_LENGTH = 280
 
 
 def _enum_values(enum_cls: type[StrEnum]) -> list[str]:
-    """Persist enum values (e.g. "too_big"), not member names."""
+    """Persist enum values (e.g. "stuck"), not member names."""
     return [member.value for member in enum_cls]
 
 
@@ -93,20 +104,64 @@ class User(TimestampMixin, Base):
     """An account. Auth columns match fastapi-users' expected schema."""
 
     __tablename__ = "user"
-    __table_args__ = (
-        CheckConstraint(
-            "daily_capacity_minutes BETWEEN 1 AND 1440", name="daily_capacity_range"
-        ),
+    if TYPE_CHECKING:
+        # Plain types so `User` satisfies fastapi-users' `UserProtocol`.
+        id: uuid.UUID
+        email: str
+        hashed_password: str
+        is_active: bool
+        is_superuser: bool
+        is_verified: bool
+    else:
+        id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+        email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+        hashed_password: Mapped[str] = mapped_column(String(1024))
+        is_active: Mapped[bool] = mapped_column(default=True)
+        is_superuser: Mapped[bool] = mapped_column(default=False)
+        is_verified: Mapped[bool] = mapped_column(default=False)
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    # Asked for on first sign-in; NULL until the user has told us.
+    display_name: Mapped[str | None] = mapped_column(String(100))
+
+
+def utc_now() -> datetime:
+    """Current time as an aware UTC datetime."""
+    return datetime.now(UTC)
+
+
+class AccessToken(Base):
+    """Short-lived opaque bearer token; deleting the row revokes it."""
+
+    __tablename__ = "access_token"
+
+    token: Mapped[str] = mapped_column(String(43), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
     )
 
+
+class RefreshToken(Base):
+    """Single-use refresh token. Only its SHA-256 hash is stored.
+
+    Rotation keeps a `family_id`, so reuse of a spent token revokes the family.
+    """
+
+    __tablename__ = "refresh_token"
+
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(1024))
-    is_active: Mapped[bool] = mapped_column(default=True)
-    is_superuser: Mapped[bool] = mapped_column(default=False)
-    is_verified: Mapped[bool] = mapped_column(default=False)
-    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
-    daily_capacity_minutes: Mapped[int] = mapped_column(default=480)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    family_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Goal(TimestampMixin, Base):
@@ -129,19 +184,23 @@ class Goal(TimestampMixin, Base):
 
 
 class Task(TimestampMixin, Base):
-    """A unit of work toward a goal, always with a concrete next action."""
+    """A unit of work, broken into steps, optionally toward a goal.
+
+    The first unfinished step is the task's next action. A task with no due
+    date sits in the Someday bucket.
+    """
 
     __tablename__ = "task"
     __table_args__ = (
-        # Composite FK guarantees a task's owner is its goal's owner.
+        # Composite FK guarantees a task's owner is its goal's owner. It is
+        # not checked when `goal_id` is NULL, so goal-less tasks are allowed.
         ForeignKeyConstraint(
             ["goal_id", "user_id"],
             ["goal.id", "goal.user_id"],
             ondelete="CASCADE",
         ),
-        CheckConstraint("estimate_minutes > 0", name="estimate_positive"),
+        CheckConstraint("time_limit_minutes > 0", name="time_limit_positive"),
         CheckConstraint("postpone_count >= 0", name="postpone_count_non_negative"),
-        CheckConstraint("length(trim(next_action)) > 0", name="next_action_present"),
         UniqueConstraint("id", "user_id"),
     )
 
@@ -149,16 +208,39 @@ class Task(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), index=True
     )
-    goal_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     title: Mapped[str] = mapped_column(String(200))
-    next_action: Mapped[str] = mapped_column(String(500))
-    estimate_minutes: Mapped[int | None]
+    # Total time the user allows for the task, across all sittings.
+    time_limit_minutes: Mapped[int | None]
     due_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[TaskStatus] = mapped_column(
         _enum_column(TaskStatus), default=TaskStatus.TODO
     )
     postpone_count: Mapped[int] = mapped_column(default=0)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    steps: Mapped[list[TaskStep]] = relationship(
+        order_by="TaskStep.position, TaskStep.id",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
+
+
+class TaskStep(Base):
+    """One checklist step of a task, in `position` order."""
+
+    __tablename__ = "task_step"
+    __table_args__ = (
+        CheckConstraint("length(trim(text)) > 0", name="text_present"),
+        CheckConstraint("position >= 0", name="position_non_negative"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int]
+    text: Mapped[str] = mapped_column(String(500))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TaskPostponement(Base):
@@ -167,7 +249,12 @@ class TaskPostponement(Base):
     __tablename__ = "task_postponement"
     __table_args__ = (
         CheckConstraint(
-            "from_date IS NULL OR to_date > from_date", name="moves_forward"
+            "from_date IS NULL OR to_date IS NULL OR to_date > from_date",
+            name="moves_forward",
+        ),
+        CheckConstraint(
+            "reason <> 'other' OR length(trim(coalesce(note, ''))) > 0",
+            name="other_has_note",
         ),
     )
 
@@ -176,8 +263,10 @@ class TaskPostponement(Base):
         ForeignKey("task.id", ondelete="CASCADE"), index=True
     )
     from_date: Mapped[date | None] = mapped_column(Date)
-    to_date: Mapped[date] = mapped_column(Date)
+    # NULL means the task was moved to Someday.
+    to_date: Mapped[date | None] = mapped_column(Date)
     reason: Mapped[PostponeReason] = mapped_column(_enum_column(PostponeReason))
+    note: Mapped[str | None] = mapped_column(String(POSTPONE_NOTE_MAX_LENGTH))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -223,3 +312,89 @@ class DailyPlanItem(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[uuid.UUID]
     rank: Mapped[int] = mapped_column(SmallInteger)
+
+
+class Routine(TimestampMixin, Base):
+    """A recurring item, ticked off on each day it is due.
+
+    Unlike tasks, routines are never postponed and never enter the Top 3:
+    a missed day simply stays unticked.
+    """
+
+    __tablename__ = "routine"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["goal_id", "user_id"],
+            ["goal.id", "goal.user_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("id", "user_id"),
+        CheckConstraint("end_date >= start_date", name="ends_after_start"),
+        CheckConstraint(
+            "(frequency = 'weekly') = (weekdays IS NOT NULL)", name="weekly_has_days"
+        ),
+        CheckConstraint(
+            "weekdays IS NULL OR (cardinality(weekdays) > 0"
+            " AND weekdays <@ ARRAY[0, 1, 2, 3, 4, 5, 6]::smallint[])",
+            name="weekdays_valid",
+        ),
+        CheckConstraint(
+            "(frequency = 'monthly') = (day_of_month IS NOT NULL)",
+            name="monthly_has_day",
+        ),
+        CheckConstraint("day_of_month BETWEEN 1 AND 31", name="day_of_month_range"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    frequency: Mapped[RoutineFrequency] = mapped_column(_enum_column(RoutineFrequency))
+    # ISO weekday numbers minus one: 0 = Monday ... 6 = Sunday.
+    weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
+    day_of_month: Mapped[int | None] = mapped_column(SmallInteger)
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)
+
+
+class RoutineCompletion(Base):
+    """A routine ticked off on one day."""
+
+    __tablename__ = "routine_completion"
+
+    routine_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("routine.id", ondelete="CASCADE"), primary_key=True
+    )
+    completed_on: Mapped[date] = mapped_column(Date, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Notification(Base):
+    """Something worth coming back to, shown under the bell until read.
+
+    For now these are the fixes suggested when a task is postponed.
+    """
+
+    __tablename__ = "notification"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    # The task it is about; kept (unlinked) if the task is later deleted.
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("task.id", ondelete="SET NULL"), index=True
+    )
+    task_title: Mapped[str] = mapped_column(String(200))
+    reason: Mapped[PostponeReason] = mapped_column(_enum_column(PostponeReason))
+    headline: Mapped[str] = mapped_column(String(200))
+    actions: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    reflection: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

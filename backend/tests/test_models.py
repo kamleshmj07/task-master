@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.models import (
@@ -15,6 +15,7 @@ from task_master.models import (
     Task,
     TaskPostponement,
     TaskStatus,
+    TaskStep,
     User,
 )
 from tests.factories import make_goal, make_plan, make_task, make_user
@@ -35,11 +36,7 @@ class TestUser:
     async def test_applies_defaults(self, db_session: AsyncSession) -> None:
         user = await make_user(db_session)
 
-        assert (user.timezone, user.daily_capacity_minutes, user.is_active) == (
-            "UTC",
-            480,
-            True,
-        )
+        assert (user.timezone, user.is_active) == ("UTC", True)
 
     async def test_rejects_duplicate_email(self, db_session: AsyncSession) -> None:
         await make_user(db_session, email="dup@example.com")
@@ -47,18 +44,6 @@ class TestUser:
         await assert_rejected(
             db_session, User(email="dup@example.com", hashed_password="x")
         )
-
-    async def test_rejects_zero_capacity(self, db_session: AsyncSession) -> None:
-        user = User(email="a@example.com", hashed_password="x")
-        user.daily_capacity_minutes = 0
-
-        await assert_rejected(db_session, user)
-
-    async def test_rejects_capacity_over_a_day(self, db_session: AsyncSession) -> None:
-        user = User(email="a@example.com", hashed_password="x")
-        user.daily_capacity_minutes = 1441
-
-        await assert_rejected(db_session, user)
 
 
 class TestGoal:
@@ -96,15 +81,45 @@ class TestTask:
 
         assert (task.status, task.postpone_count) == (TaskStatus.TODO, 0)
 
-    async def test_rejects_blank_next_action(self, db_session: AsyncSession) -> None:
-        goal = await make_goal(db_session, await make_user(db_session))
-
-        await assert_rejected(
-            db_session,
-            Task(user_id=goal.user_id, goal_id=goal.id, title="t", next_action="  "),
+    async def test_rejects_blank_step(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
         )
 
-    async def test_rejects_zero_estimate(self, db_session: AsyncSession) -> None:
+        await assert_rejected(
+            db_session, TaskStep(task_id=task.id, position=1, text="  ")
+        )
+
+    async def test_keeps_steps_in_position_order(
+        self, db_session: AsyncSession
+    ) -> None:
+        goal = await make_goal(db_session, await make_user(db_session))
+        task = Task(
+            user_id=goal.user_id,
+            goal_id=goal.id,
+            title="t",
+            steps=[
+                TaskStep(position=1, text="second"),
+                TaskStep(position=0, text="first"),
+            ],
+        )
+        db_session.add(task)
+        await db_session.flush()
+        await db_session.refresh(task)
+
+        assert [step.text for step in task.steps] == ["first", "second"]
+
+    async def test_deleting_task_removes_steps(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+
+        await db_session.delete(task)
+        await db_session.flush()
+
+        assert (await db_session.scalars(select(TaskStep))).all() == []
+
+    async def test_rejects_zero_time_limit(self, db_session: AsyncSession) -> None:
         goal = await make_goal(db_session, await make_user(db_session))
 
         await assert_rejected(
@@ -113,8 +128,7 @@ class TestTask:
                 user_id=goal.user_id,
                 goal_id=goal.id,
                 title="t",
-                next_action="do it",
-                estimate_minutes=0,
+                time_limit_minutes=0,
             ),
         )
 
@@ -126,7 +140,7 @@ class TestTask:
 
         await assert_rejected(
             db_session,
-            Task(user_id=intruder.id, goal_id=goal.id, title="t", next_action="x"),
+            Task(user_id=intruder.id, goal_id=goal.id, title="t"),
         )
 
     async def test_deleting_goal_removes_tasks(self, db_session: AsyncSession) -> None:
@@ -139,6 +153,18 @@ class TestTask:
         assert (await db_session.scalars(select(Task))).all() == []
 
 
+def _postponement(
+    task: Task, reason: PostponeReason, note: str | None = None
+) -> TaskPostponement:
+    return TaskPostponement(
+        task_id=task.id,
+        from_date=TODAY,
+        to_date=date(2026, 11, 20),
+        reason=reason,
+        note=note,
+    )
+
+
 class TestTaskPostponement:
     async def test_stores_reason(self, db_session: AsyncSession) -> None:
         task = await make_task(
@@ -148,14 +174,14 @@ class TestTaskPostponement:
             task_id=task.id,
             from_date=TODAY,
             to_date=date(2026, 11, 20),
-            reason=PostponeReason.TOO_BIG,
+            reason=PostponeReason.STUCK,
         )
         db_session.add(postponement)
         await db_session.flush()
 
         stored = await db_session.scalar(select(TaskPostponement.reason))
 
-        assert stored is PostponeReason.TOO_BIG
+        assert stored is PostponeReason.STUCK
 
     async def test_rejects_moving_backwards(self, db_session: AsyncSession) -> None:
         task = await make_task(
@@ -168,9 +194,72 @@ class TestTaskPostponement:
                 task_id=task.id,
                 from_date=TODAY,
                 to_date=TODAY,
-                reason=PostponeReason.NO_TIME,
+                reason=PostponeReason.BLOCKED,
             ),
         )
+
+    async def test_rejects_other_without_note(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+
+        await assert_rejected(db_session, _postponement(task, PostponeReason.OTHER))
+
+    async def test_rejects_other_with_blank_note(
+        self, db_session: AsyncSession
+    ) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+
+        await assert_rejected(
+            db_session, _postponement(task, PostponeReason.OTHER, note="   ")
+        )
+
+    async def test_stores_other_with_note(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        db_session.add(_postponement(task, PostponeReason.OTHER, note="Sick day"))
+        await db_session.flush()
+
+        stored = await db_session.scalar(select(TaskPostponement.note))
+
+        assert stored == "Sick day"
+
+    async def test_allows_note_with_any_reason(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        db_session.add(
+            _postponement(task, PostponeReason.BLOCKED, note="Waiting on Sam")
+        )
+        await db_session.flush()
+
+        stored = await db_session.scalar(select(TaskPostponement.note))
+
+        assert stored == "Waiting on Sam"
+
+    async def test_rejects_note_over_280_chars(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        db_session.add(_postponement(task, PostponeReason.OTHER, note="x" * 281))
+
+        with pytest.raises(DBAPIError):
+            await db_session.flush()
+
+    async def test_rejects_retired_reason(self, db_session: AsyncSession) -> None:
+        task = await make_task(
+            db_session, await make_goal(db_session, await make_user(db_session))
+        )
+        insert = text(
+            "INSERT INTO task_postponement (id, task_id, to_date, reason) "
+            "VALUES (gen_random_uuid(), :task_id, :to_date, 'too_big')"
+        )
+
+        with pytest.raises(IntegrityError):
+            await db_session.execute(insert, {"task_id": task.id, "to_date": TODAY})
 
 
 class TestDailyPlan:

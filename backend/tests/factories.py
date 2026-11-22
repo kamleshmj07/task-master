@@ -5,7 +5,7 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from task_master.models import DailyPlan, Goal, Task, User
+from task_master.models import DailyPlan, Goal, Task, TaskStep, User
 
 
 async def make_user(session: AsyncSession, email: str | None = None) -> User:
@@ -33,8 +33,8 @@ async def make_task(session: AsyncSession, goal: Goal) -> Task:
         user_id=goal.user_id,
         goal_id=goal.id,
         title="Write the schema",
-        next_action="Open models.py and add the User class",
-        estimate_minutes=25,
+        time_limit_minutes=25,
+        steps=[TaskStep(position=0, text="Open models.py and add the User class")],
     )
     session.add(task)
     await session.flush()

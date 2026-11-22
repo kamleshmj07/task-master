@@ -1,6 +1,7 @@
 """Shared test fixtures."""
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -14,9 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.config import Settings
 from task_master.database import create_engine
+from task_master.dependencies import get_now, get_session
 from task_master.main import create_app
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
+# API tests run at this moment, so "today" is always 2026-11-22 in UTC.
+FIXED_NOW = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
 
 
 class DatabaseTestSettings(BaseSettings):
@@ -42,6 +46,7 @@ def settings() -> Settings:
         environment="test",
         cors_origins=["http://test.local"],
         database_url=SecretStr("postgresql+asyncpg://unused@localhost/unused"),
+        auth_secret=SecretStr("test-auth-secret"),
     )
 
 
@@ -98,3 +103,42 @@ async def db_session(migrated_db: str) -> AsyncIterator[AsyncSession]:
             await session.close()
             await transaction.rollback()
     await engine.dispose()
+
+
+@pytest.fixture
+async def api_client(
+    settings: Settings, db_session: AsyncSession
+) -> AsyncIterator[AsyncClient]:
+    """HTTPS client whose requests share the rolled-back test session."""
+
+    async def override_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app = create_app(settings)
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_now] = lambda: FIXED_NOW
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="https://test") as client:
+        yield client
+
+
+async def login_headers(client: AsyncClient, email: str) -> dict[str, str]:
+    """Register `email`, log in on mobile, and return bearer auth headers."""
+    password = "correct-horse-battery"
+    await client.post("/auth/register", json={"email": email, "password": password})
+    response = await client.post(
+        "/auth/mobile/login", data={"username": email, "password": password}
+    )
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture
+async def auth_headers(api_client: AsyncClient) -> dict[str, str]:
+    """Bearer headers for a freshly registered user."""
+    return await login_headers(api_client, "owner@example.com")
+
+
+@pytest.fixture
+async def other_headers(api_client: AsyncClient) -> dict[str, str]:
+    """Bearer headers for a second, unrelated user."""
+    return await login_headers(api_client, "stranger@example.com")

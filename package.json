@@ -1,0 +1,18 @@
+{
+  "name": "task-master",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "generate:api": "cd backend && uv run python -m task_master.openapi ../packages/api-client/openapi.json && cd .. && npm run generate --workspace @task-master/api-client"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

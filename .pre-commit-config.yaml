@@ -12,3 +12,5 @@ repos:
     hooks:
       - id: prettier
         types_or: [yaml, json]
+        # Generated files must match their generators byte for byte.
+        exclude: ^(package-lock\.json|packages/api-client/openapi\.json)$
