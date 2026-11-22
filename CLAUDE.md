@@ -2,7 +2,7 @@
 
 Goal-driven task manager to beat procrastination. Read this first when
 picking up development. Shared rules (uv only, anyio tests, commit message
-style, `ArthurClune` as PR reviewer, security and testing rules) live in
+style, security and testing rules) live in
 `C:\dev\CLAUDE.md` and `C:\dev\.claude\rules\`; this file adds what is
 specific to this repo.
 
@@ -137,8 +137,8 @@ artifact (artboard "Tasks page – Desk lamp direction").
 - Active branch: **`feature/tasks-page`**, for Tasks page work only. Other
   pages get their own branches when needed. Each branch reaches `master`
   through a PR.
-- `ArthurClune` is not a collaborator on `kamleshmj07/task-master`, so
-  GitHub cannot add them as a reviewer until they are invited.
+- PRs are opened without a reviewer for now: the reviewer rule in
+  `C:\dev\.claude\rules\backend.md` is temporarily switched off.
 - Dev database migrated to `c2e193cd6125` (head).
 - Tests: 383 backend (98% coverage), 99 web, 3 api-client, all passing.
 

@@ -126,7 +126,8 @@ the API must share a registrable domain (e.g. `app.example.com` and
 
 Finished tasks stay under Done for 90 days
 (`TASK_MASTER_COMPLETED_TASK_RETENTION_DAYS`), then a clean-up job deletes
-them together with their steps, postponements and plan slots. Open tasks are
+them together with their steps, postponements and plan slots. Read
+notifications older than that are deleted too; unread ones and open tasks are
 never deleted. Run it once a day from cron, Windows Task Scheduler or your
 platform's scheduler:
 
