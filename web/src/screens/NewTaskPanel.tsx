@@ -73,9 +73,8 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
       </label>
 
       <fieldset className="plain stack-sm">
-        <legend>
-          Steps <span className="muted">· the first one is required</span>
-        </legend>
+        <legend>Steps</legend>
+        <p className="hint">Start with the very first physical action. You can add more later.</p>
         {steps.map((step, index) => (
           <div key={index} className="row nowrap">
             <span className="step-number" aria-hidden="true">
@@ -146,9 +145,8 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
           onUnitChange={setLimitUnit}
         />
         <label>
-          <span>
-            Due date <span className="muted">· empty = Someday</span>
-          </span>
+          <span>Due date</span>
+          <span className="hint">Leave empty to keep it in Someday.</span>
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </label>
       </div>

@@ -33,14 +33,14 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000)
 }
 
-/** "Today", "Tomorrow", "Overdue · Fri 20 Nov", or the plain day. */
+/** "Due today", "Due tomorrow", "Overdue since Fri 20 Nov", "Due Sat 28 Nov". */
 export function dueLabel(iso: string | null, today: string): string {
-  if (iso === null) return 'Someday'
+  if (iso === null) return 'No date'
   const delta = daysBetween(today, iso)
-  if (delta === 0) return 'Today'
-  if (delta === 1) return 'Tomorrow'
-  if (delta < 0) return `Overdue · ${formatDay(iso)}`
-  return formatDay(iso)
+  if (delta === 0) return 'Due today'
+  if (delta === 1) return 'Due tomorrow'
+  if (delta < 0) return `Overdue since ${formatDay(iso)}`
+  return `Due ${formatDay(iso)}`
 }
 
 export interface QuickDate {

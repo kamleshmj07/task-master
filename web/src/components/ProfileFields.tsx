@@ -23,9 +23,8 @@ export function ProfileFields({ name, timezone, onNameChange, onTimezoneChange }
         />
       </label>
       <label>
-        <span>
-          Timezone <span className="muted">· decides when your day starts</span>
-        </span>
+        <span>Timezone</span>
+        <span className="hint">Decides when your day starts.</span>
         <select required value={timezone} onChange={(e) => onTimezoneChange(e.target.value)}>
           {timezoneOptions(timezone).map((zone) => (
             <option key={zone} value={zone}>

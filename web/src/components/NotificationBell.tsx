@@ -76,7 +76,7 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="panel" role="dialog" aria-label="Notifications">
+        <div className="bell-panel" role="dialog" aria-label="Notifications">
           <div className="row between panel-head">
             <h2>Notifications</h2>
             {unread > 0 && (
@@ -89,9 +89,10 @@ export function NotificationBell() {
           <ul className="list panel-list">
             {items?.map((item) => (
               <li key={item.id} className={item.read ? 'note' : 'note unread'}>
+                {!item.read && <span className="unread-dot" aria-hidden="true" />}
                 <div className="grow stack-xs">
                   <p className="small muted">
-                    Tip for “{item.task_title}” · {timeAgo(item.created_at)}
+                    Tip for “{item.task_title}”, {timeAgo(item.created_at)}
                   </p>
                   <p className="title">{item.headline}</p>
                   <ul className="note-actions">

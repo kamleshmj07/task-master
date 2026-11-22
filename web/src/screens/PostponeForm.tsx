@@ -51,7 +51,7 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
     <Modal title="Why are you putting this off?" onClose={onClose}>
       <form className="stack" onSubmit={handleSubmit}>
         <p className="muted">
-          “{task.title}”{task.due_date ? ` · due ${formatDay(task.due_date)}` : ''}
+          “{task.title}”{task.due_date ? `, due ${formatDay(task.due_date)}` : ', no date yet'}
         </p>
         <div className="reasons" role="group" aria-label="Reason">
           {REASONS.map(({ value, label, hint, fix }) => (
@@ -67,7 +67,7 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
             >
               <span className="reason-label">{label}</span>
               <span className="reason-hint">{hint}</span>
-              <span className="reason-fix">→ {fix}</span>
+              <span className="reason-fix">{fix}</span>
             </button>
           ))}
         </div>
@@ -80,7 +80,7 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
 
         <div className="stack-sm">
           <p className="field-label" id="move-to">
-            Move to
+            Move it to
           </p>
           <div className="chips" role="group" aria-labelledby="move-to">
             {chips.map((chip) => (
@@ -119,7 +119,7 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
             </label>
           )}
           <p className="muted small" aria-live="polite">
-            {toDate ? `New due date: ${formatDay(toDate)}` : 'No date: it moves to Someday.'}
+            {toDate ? `New due date: ${formatDay(toDate)}` : 'It moves to Someday, with no date.'}
           </p>
         </div>
 
@@ -171,13 +171,13 @@ export function SuggestionCard({ result, onDismiss, onOpenSteps }: SuggestionCar
           </svg>
         </span>
         <div className="grow">
-          <p className="eyebrow">
-            Moved “{task.title}” to {where}
+          <p className="muted small">
+            Moved “{task.title}” to {where}. Saved to your notifications.
           </p>
           <h3>{suggestion.headline}</h3>
         </div>
       </div>
-      <p className="muted small">Try one of these before it comes back:</p>
+      <p className="muted small">Try one of these before it comes back.</p>
       <ul className="list">
         {suggestion.actions.map((action) => (
           <li key={action}>
@@ -199,8 +199,7 @@ export function SuggestionCard({ result, onDismiss, onOpenSteps }: SuggestionCar
           {suggestion.reflection}
         </p>
       )}
-      <div className="row between">
-        <p className="muted small">Saved to your notifications.</p>
+      <div className="row end">
         <div className="row">
           {startsWithSteps && onOpenSteps && (
             <button type="button" className="primary" onClick={onOpenSteps}>

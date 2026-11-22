@@ -25,7 +25,7 @@ function renderDialog(dueDate: string | null = null) {
 }
 
 const reasons = () => within(screen.getByRole('group', { name: 'Reason' }))
-const moveTo = () => within(screen.getByRole('group', { name: 'Move to' }))
+const moveTo = () => within(screen.getByRole('group', { name: 'Move it to' }))
 
 beforeEach(() => {
   mockApi.POST.mockReset()
@@ -176,7 +176,7 @@ describe('SuggestionCard', () => {
   it('says where the task went', () => {
     render(<SuggestionCard result={result('blocked')} onDismiss={vi.fn()} />)
 
-    expect(screen.getByText('Moved “Tax” to Someday')).toBeInTheDocument()
+    expect(screen.getByText('Moved “Tax” to Someday. Saved to your notifications.')).toBeInTheDocument()
   })
 
   it('lists the fixes as a checklist', () => {

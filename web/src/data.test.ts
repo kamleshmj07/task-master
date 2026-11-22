@@ -109,14 +109,14 @@ describe('dates', () => {
   })
 
   it.each([
-    [null, 'Someday'],
-    [TODAY, 'Today'],
-    ['2026-11-23', 'Tomorrow'],
+    [null, 'No date'],
+    [TODAY, 'Due today'],
+    ['2026-11-23', 'Due tomorrow'],
   ])('labels %s as %j', (iso, label) => {
     expect(dueLabel(iso, TODAY)).toBe(label)
   })
 
   it('marks overdue dates', () => {
-    expect(dueLabel('2026-11-20', TODAY)).toMatch(/^Overdue · /)
+    expect(dueLabel('2026-11-20', TODAY)).toMatch(/^Overdue since /)
   })
 })

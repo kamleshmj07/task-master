@@ -12,9 +12,8 @@ export function TimeLimitField({ amount, unit, onAmountChange, onUnitChange }: T
   const hours = unit === 'hours'
   return (
     <fieldset className="plain stack-sm">
-      <legend>
-        Time limit <span className="muted">· optional, total time</span>
-      </legend>
+      <legend>Time limit</legend>
+      <p className="hint">Optional. The most time you want to spend on it in total.</p>
       <div className="row nowrap">
         <input
           className="grow"

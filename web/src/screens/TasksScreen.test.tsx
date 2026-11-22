@@ -93,14 +93,14 @@ describe('TasksScreen views', () => {
 
   it('groups scheduled tasks by when they are due', async () => {
     mockData([
-      makeTask({ id: 'a', title: 'Due today', due_date: TODAY }),
-      makeTask({ id: 'b', title: 'Due later', due_date: '2099-01-01' }),
+      makeTask({ id: 'a', title: 'Morning task', due_date: TODAY }),
+      makeTask({ id: 'b', title: 'Distant task', due_date: '2099-01-01' }),
     ])
     render(<TasksScreen />)
 
     const today = await screen.findByRole('region', { name: 'Today' })
-    expect(within(today).getByText('Due today')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Later' })).getByText('Due later')).toBeInTheDocument()
+    expect(within(today).getByText('Morning task')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Later' })).getByText('Distant task')).toBeInTheDocument()
   })
 
   it('switches to Someday', async () => {
@@ -129,7 +129,7 @@ describe('TasksScreen views', () => {
     mockData([makeTask({ due_date: TODAY })])
     render(<TasksScreen />)
 
-    expect(await screen.findByText('Find the policy')).toBeInTheDocument()
+    expect(await screen.findByText('Next: Find the policy')).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
@@ -178,7 +178,7 @@ describe('TasksScreen paging', () => {
     render(<TasksScreen />)
     await userEvent.click(await screen.findByRole('tab', { name: 'Someday 60' }))
 
-    expect(await screen.findByRole('button', { name: 'Load more · 10 more' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Load 10 more' })).toBeInTheDocument()
     expect(screen.getAllByRole('article')).toHaveLength(50)
   })
 
@@ -187,10 +187,10 @@ describe('TasksScreen paging', () => {
     render(<TasksScreen />)
     await userEvent.click(await screen.findByRole('tab', { name: 'Someday 60' }))
 
-    await userEvent.click(await screen.findByRole('button', { name: /Load more/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Load \d+ more/ }))
 
     expect(await screen.findByText('Task 59')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Load more/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Load \d+ more/ })).not.toBeInTheDocument()
   })
 
   it('takes counts from the server, not from loaded tasks', async () => {
@@ -219,7 +219,7 @@ describe('TasksScreen steps', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Call the broker' }))
 
-    expect(await screen.findByRole('dialog', { name: 'All steps done' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Every step is done' })).toBeInTheDocument()
   })
 
   it('completes the task only after confirming', async () => {
@@ -299,7 +299,7 @@ describe('New task', () => {
     mockApi.POST.mockReturnValue(ok(makeTask()))
     render(<TasksScreen />)
 
-    await userEvent.click(await screen.findByRole('button', { name: '+ New task' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'New task' }))
     const form = screen.getByRole('form', { name: 'New task' })
     await userEvent.type(within(form).getByRole('textbox', { name: 'Task' }), 'Renew insurance')
     await userEvent.type(within(form).getByRole('textbox', { name: 'Step 1' }), 'Find the policy')
@@ -326,7 +326,7 @@ describe('New task', () => {
     mockApi.POST.mockReturnValue(ok({ ...GOALS[0], id: 'g2', title: 'Fitness' }))
     render(<TasksScreen />)
 
-    await userEvent.click(await screen.findByRole('button', { name: '+ New task' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'New task' }))
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Goal' }), '+ New goal…')
     await userEvent.type(screen.getByRole('textbox', { name: 'New goal name' }), 'Fitness')
     await userEvent.click(screen.getByRole('button', { name: 'Create' }))
@@ -338,7 +338,7 @@ describe('New task', () => {
     mockData([])
     render(<TasksScreen />)
 
-    await userEvent.click(await screen.findByRole('button', { name: '+ New task' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'New task' }))
 
     expect(screen.getByRole('textbox', { name: 'Step 1' })).toBeRequired()
   })

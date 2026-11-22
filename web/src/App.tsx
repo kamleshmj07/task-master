@@ -43,9 +43,10 @@ function Shell() {
       <header className="topbar">
         <div className="topbar-inner">
           <span className="brand">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="m8 12 3 3 5-6" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 20h16" />
+              <path d="M7 20 12 6l5 14" />
+              <circle cx="12" cy="6" r="2" fill="currentColor" />
             </svg>
             Task Master
           </span>

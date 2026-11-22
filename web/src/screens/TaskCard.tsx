@@ -16,7 +16,7 @@ interface TaskCardProps {
   onPostpone: () => void
 }
 
-/** One task: title, next step and facts; expands to its step checklist. */
+/** One task row: status rail, title, its next step, facts; expands to its steps. */
 export function TaskCard({
   task,
   today,
@@ -29,8 +29,10 @@ export function TaskCard({
   const done = task.status === 'done'
   const finished = task.steps.filter((step) => step.done).length
   const overdue = !done && task.due_date !== null && daysBetween(today, task.due_date) < 0
-  const dueToday = !done && task.due_date === today
+  const ready = !done && task.next_step === null
   const limit = timeLimitLabel(task.time_limit_minutes)
+  const rail = overdue ? 'rail loss' : ready ? 'rail gain' : 'rail'
+  const next = done ? 'Completed' : ready ? 'Every step is done' : `Next: ${task.next_step}`
 
   async function handleToggleTask() {
     const { data } = await api.PATCH('/tasks/{task_id}', {
@@ -41,7 +43,8 @@ export function TaskCard({
   }
 
   return (
-    <article className={open ? 'task open' : 'task'}>
+    <article className={open ? 'task-row open' : 'task-row'}>
+      <span className={rail} aria-hidden="true" />
       <div className="task-head">
         <input
           type="checkbox"
@@ -50,26 +53,23 @@ export function TaskCard({
           checked={done}
           onChange={() => void handleToggleTask()}
         />
-        <div className="grow stack-xs">
+        <div className="grow">
           <button type="button" className="unstyled task-title" aria-expanded={open} onClick={onToggleOpen}>
             <span className={done ? 'title done' : 'title'}>{task.title}</span>
-            <span className="next">
-              <strong>Next:</strong> {done ? 'All done' : (task.next_step ?? 'All steps done. Mark complete?')}
-            </span>
+            <span className={done || ready ? 'next-step settled' : 'next-step'}>{next}</span>
           </button>
-          <div className="pills">
-            <span className={overdue ? 'pill loss' : dueToday ? 'pill today' : 'pill'}>
-              {dueLabel(task.due_date, today)}
+          <div className="facts">
+            <span className={overdue ? 'loss strong' : undefined}>{dueLabel(task.due_date, today)}</span>
+            <span>
+              {finished} of {task.steps.length} {task.steps.length === 1 ? 'step' : 'steps'}
             </span>
-            <span className="pill">
-              <span className="bar" aria-hidden="true">
-                <span style={{ width: `${(finished / task.steps.length) * 100}%` }} />
+            {limit && <span>{limit} limit</span>}
+            {goalTitle && <span>{goalTitle}</span>}
+            {task.postpone_count > 0 && (
+              <span className="loss strong">
+                Postponed {task.postpone_count} {task.postpone_count === 1 ? 'time' : 'times'}
               </span>
-              {finished}/{task.steps.length} steps
-            </span>
-            {limit && <span className="pill">{limit} limit</span>}
-            {goalTitle && <span className="pill">{goalTitle}</span>}
-            {task.postpone_count > 0 && <span className="pill loss">Postponed {task.postpone_count}×</span>}
+            )}
           </div>
         </div>
         <div className="row nowrap">
@@ -101,6 +101,8 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState<number | null>(null)
   const [over, setOver] = useState<number | null>(null)
+  // The step that just became next; it glows once to show what changed.
+  const [glowId, setGlowId] = useState<string | null>(null)
   const nextIndex = task.steps.findIndex((step) => !step.done)
   const canReorder = task.steps.length > 1
 
@@ -111,6 +113,7 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
     })
     if (!data) return
     const allDone = data.steps.every((step) => step.done)
+    setGlowId(data.steps.find((step) => !step.done)?.id ?? null)
     onChanged(data, done && allDone && data.status === 'todo')
   }
 
@@ -161,12 +164,12 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
 
   return (
     <div className="steps">
-      <p className="eyebrow">Steps{canReorder ? ' · drag to reorder' : ''}</p>
-      <ul className="list">
+      {canReorder && <p className="hint">Drag a step by its handle to reorder it.</p>}
+      <ol className="trail" aria-label={`Steps for “${task.title}”`}>
         {task.steps.map((step, index) => (
           <li
             key={step.id}
-            className={over === index && dragging !== index ? 'step drop-target' : 'step'}
+            className={stepClass(step.id === glowId, over === index && dragging !== index)}
             draggable={canReorder}
             onDragStart={(event) => {
               event.dataTransfer.effectAllowed = 'move'
@@ -211,16 +214,22 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
                 </svg>
               </button>
             )}
+            <span
+              className={step.done ? 'node done' : index === nextIndex && task.status === 'todo' ? 'node next' : 'node'}
+              aria-hidden="true"
+            >
+              {index + 1}
+            </span>
             <label className="choice grow">
+              <span className={step.done ? 'step-text done' : index === nextIndex ? 'step-text next' : 'step-text'}>
+                {step.text}
+              </span>
               <input
                 type="checkbox"
-                className="check"
+                className="tick"
                 checked={step.done}
                 onChange={() => void handleToggle(step.id, !step.done)}
               />
-              <span className={step.done ? 'done' : index === nextIndex ? 'step-next' : undefined}>
-                {step.text}
-              </span>
             </label>
             {task.steps.length > 1 && (
               <button
@@ -236,8 +245,8 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
             )}
           </li>
         ))}
-      </ul>
-      <form className="row" onSubmit={handleAdd}>
+      </ol>
+      <form className="row add-step" onSubmit={handleAdd}>
         <input
           className="grow"
           aria-label={`Add a step to “${task.title}”`}
@@ -256,4 +265,8 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
       )}
     </div>
   )
+}
+
+function stepClass(glow: boolean, dropTarget: boolean): string {
+  return ['step', glow && 'glow', dropTarget && 'drop-target'].filter(Boolean).join(' ')
 }

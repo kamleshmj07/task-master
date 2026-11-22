@@ -19,6 +19,13 @@ const VIEWS: { id: View; label: string }[] = [
   { id: 'done', label: 'Done' },
 ]
 
+const SUBTITLES: Record<View, string> = {
+  scheduled: 'Each task shows its next step. Start there.',
+  review: 'Overdue tasks, and tasks whose steps are all done, wait here for a decision.',
+  someday: 'Ideas with no date yet. Give one a date when you are ready.',
+  done: 'Finished tasks stay here for 90 days.',
+}
+
 const EMPTY_HINTS: Record<View, string> = {
   scheduled: 'Add a task with a due date to see it here.',
   review: 'Overdue tasks and tasks with every step done show up here.',
@@ -68,12 +75,17 @@ export function TasksScreen() {
     <section className="stack-lg" aria-labelledby="tasks-heading">
       <div className="row between wrap-end">
         <div>
-          <h1 id="tasks-heading">Tasks</h1>
-          <p className="muted">Every task starts with a concrete first step.</p>
+          <h1 id="tasks-heading" className="page-title">
+            Tasks
+          </h1>
+          <p className="muted lede">{SUBTITLES[view]}</p>
         </div>
         {!adding && (
           <button type="button" className="primary large" onClick={() => setAdding(true)}>
-            + New task
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            New task
           </button>
         )}
       </div>
@@ -113,7 +125,7 @@ export function TasksScreen() {
       )}
 
       <div className="stack-sm">
-        <div className="segmented" role="tablist" aria-label="Task views">
+        <div className="tabs" role="tablist" aria-label="Task views">
           {VIEWS.map(({ id, label }) => (
             <button
               key={id}
@@ -122,7 +134,10 @@ export function TasksScreen() {
               aria-selected={view === id}
               onClick={() => setView(id)}
             >
-              {label} <span className="count">{count(id)}</span>
+              {label}{' '}
+              <span className={id === 'review' && count(id) > 0 ? 'count loss' : 'count'}>
+                {count(id)}
+              </span>
             </button>
           ))}
         </div>
@@ -146,7 +161,7 @@ export function TasksScreen() {
       </div>
 
       {tasks.tasks && groups.length === 0 && (
-        <div className="card empty">
+        <div className="panel empty">
           <p className="title">Nothing here</p>
           <p className="muted">{EMPTY_HINTS[view]}</p>
         </div>
@@ -154,9 +169,10 @@ export function TasksScreen() {
 
       {groups.map((group) => (
         <section key={group.id} className="stack-sm" aria-label={group.label}>
-          <h2 className={`group-head ${group.id}`}>
-            {group.label} <span className="muted">{group.tasks.length}</span>
+          <h2 className="group-head">
+            {group.label} <span className="group-count">{group.tasks.length}</span>
           </h2>
+          <div className="panel">
           {group.tasks.map((task) => (
             <TaskCard
               key={task.id}
@@ -172,12 +188,13 @@ export function TasksScreen() {
               }}
             />
           ))}
+          </div>
         </section>
       ))}
 
       {tasks.remaining > 0 && (
         <button type="button" className="load-more" onClick={() => void tasks.loadMore()}>
-          Load more · {tasks.remaining} more
+          Load {tasks.remaining} more
         </button>
       )}
 
@@ -195,8 +212,8 @@ export function TasksScreen() {
       )}
 
       {confirming && (
-        <Modal title="All steps done" onClose={() => setConfirming(null)}>
-          <p>Mark “{confirming.title}” as complete?</p>
+        <Modal title="Every step is done" onClose={() => setConfirming(null)}>
+          <p>Mark “{confirming.title}” complete?</p>
           <div className="row">
             <button type="button" className="primary" onClick={() => void handleConfirmComplete(confirming)}>
               Mark complete
@@ -214,6 +231,6 @@ export function TasksScreen() {
 function groupsFor(view: View, tasks: TaskRead[], today: string): TaskGroup[] {
   if (view === 'scheduled') return groupScheduled(tasks, today)
   if (view === 'review') return groupReview(tasks)
-  const label = view === 'someday' ? 'No date yet' : 'Completed'
+  const label = view === 'someday' ? 'No date yet' : 'Completed in the last 90 days'
   return tasks.length > 0 ? [{ id: view, label, tasks }] : []
 }
