@@ -85,3 +85,16 @@ platform's scheduler:
 ```bash
 uv run python -m task_master.cleanup
 ```
+
+## Test data
+
+With the API running locally, seed a test account
+(`loadmore-test@example.com` / `correct-horse-battery`) with 56 scheduled and
+4 Someday tasks, enough to show "Load more" on the Tasks page:
+
+```bash
+uv run python -m tests.seed.seed_load_more
+uv run python -m tests.seed.seed_load_more --scheduled 80 --someday 10 --email other@example.com
+```
+
+It only talks to a local API and refuses any other host.
