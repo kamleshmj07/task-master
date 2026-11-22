@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TodayScreen } from '@/screens/TodayScreen'
 import { findA11yViolations } from '@/test/axe'
+import { makeRoutine, makeTask } from '@/test/fixtures'
 import { mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -12,46 +13,11 @@ vi.mock('@/api', async (importOriginal) => ({
   api: (await import('@/test/mockApi')).mockApi,
 }))
 
-function task(id: string, title: string): TaskRead {
-  return {
-    id,
-    goal_id: null,
-    title,
-    next_action: 'Start',
-    estimate_minutes: 60,
-    due_date: null,
-    status: 'todo',
-    postpone_count: 0,
-    completed_at: null,
-    created_at: '2026-11-22T00:00:00Z',
-    updated_at: '2026-11-22T00:00:00Z',
-  }
-}
-
 function plan(overrides: Partial<PlanRead> = {}): PlanRead {
   return {
     plan_date: '2026-11-22',
-    top_three: [{ rank: 1, task: task('a', 'Draft proposal') }],
-    routines: [
-      {
-        done: false,
-        streak: 4,
-        routine: {
-          id: 'r1',
-          goal_id: null,
-          title: 'Workout',
-          estimate_minutes: 30,
-          frequency: 'daily',
-          weekdays: null,
-          day_of_month: null,
-          start_date: '2026-01-01',
-          end_date: '2026-12-31',
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        },
-      },
-    ],
-    capacity: { limit_minutes: 480, planned_minutes: 90, over: false },
+    top_three: [{ rank: 1, task: makeTask({ id: 'a', title: 'Draft proposal' }) }],
+    routines: [{ done: false, streak: 4, routine: makeRoutine() }],
     ...overrides,
   }
 }
@@ -78,6 +44,13 @@ describe('TodayScreen', () => {
     expect(within(routines!).getByText('Workout')).toBeInTheDocument()
   })
 
+  it("shows each Top 3 task's next step", async () => {
+    mockGets(plan())
+    render(<TodayScreen />)
+
+    expect(await screen.findByText('Next: Find the policy')).toBeInTheDocument()
+  })
+
   it('shows the routine streak', async () => {
     mockGets(plan())
     render(<TodayScreen />)
@@ -85,11 +58,12 @@ describe('TodayScreen', () => {
     expect(await screen.findByText('4-day streak')).toBeInTheDocument()
   })
 
-  it('warns when the day is over capacity', async () => {
-    mockGets(plan({ capacity: { limit_minutes: 60, planned_minutes: 90, over: true } }))
+  it('no longer shows a capacity meter', async () => {
+    mockGets(plan())
     render(<TodayScreen />)
+    await screen.findByText('Draft proposal')
 
-    expect(await screen.findByText(/over capacity/)).toBeInTheDocument()
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument()
   })
 
   it('ticks a routine off', async () => {
@@ -104,7 +78,10 @@ describe('TodayScreen', () => {
   })
 
   it('adds a task to the Top 3', async () => {
-    mockGets(plan(), [task('a', 'Draft proposal'), task('b', 'Call the bank')])
+    mockGets(plan(), [
+      makeTask({ id: 'a', title: 'Draft proposal' }),
+      makeTask({ id: 'b', title: 'Call the bank' }),
+    ])
     render(<TodayScreen />)
 
     await userEvent.selectOptions(

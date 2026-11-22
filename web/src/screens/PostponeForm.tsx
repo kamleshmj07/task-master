@@ -2,17 +2,18 @@ import type { PostponeReason, PostponeResponse, TaskRead } from '@task-master/ap
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { Modal } from '@/components/Modal'
 import { REASONS } from '@/data'
 import { addDays, todayIso } from '@/dates'
 
-interface PostponeFormProps {
+interface PostponeDialogProps {
   task: TaskRead
   onPostponed: (result: PostponeResponse) => void
-  onCancel: () => void
+  onClose: () => void
 }
 
-/** Ask why a task is being put off, then move it later or to Someday. */
-export function PostponeForm({ task, onPostponed, onCancel }: PostponeFormProps) {
+/** Pop-up asking why a task is being put off, then where it should go. */
+export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogProps) {
   const earliest = latest(todayIso(), task.due_date ? addDays(task.due_date, 1) : null)
   const [reason, setReason] = useState<PostponeReason | null>(null)
   const [toDate, setToDate] = useState(earliest)
@@ -30,7 +31,7 @@ export function PostponeForm({ task, onPostponed, onCancel }: PostponeFormProps)
       params: { path: { task_id: task.id } },
       body: { reason, to_date: someday ? null : toDate, note: note || null },
     })
-    if (apiError) {
+    if (apiError || !data) {
       setError(errorMessage(apiError))
       return
     }
@@ -38,67 +39,63 @@ export function PostponeForm({ task, onPostponed, onCancel }: PostponeFormProps)
   }
 
   return (
-    <form className="postpone stack" onSubmit={handleSubmit}>
-      <fieldset>
-        <legend>Why are you putting this off?</legend>
-        {REASONS.map(({ value, label }) => (
-          <label key={value} className="choice">
-            <input
-              type="radio"
-              name={`reason-${task.id}`}
-              value={value}
-              checked={reason === value}
-              onChange={() => setReason(value)}
-            />
-            {label}
+    <Modal title="Why are you putting this off?" onClose={onClose}>
+      <form className="stack" onSubmit={handleSubmit}>
+        <p className="muted">“{task.title}”</p>
+        <div className="reasons" role="group" aria-label="Reason">
+          {REASONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={reason === value ? 'reason selected' : 'reason'}
+              aria-pressed={reason === value}
+              onClick={() => {
+                setReason(value)
+                setError(null)
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {reason === 'other' && (
+          <label>
+            What's going on?
+            <input required maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
-        ))}
-      </fieldset>
-      {reason === 'other' && (
-        <label>
-          What's going on?
-          <input
-            required
-            maxLength={280}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </label>
-      )}
-      <label className="choice">
-        <input
-          type="checkbox"
-          checked={someday}
-          onChange={(event) => setSomeday(event.target.checked)}
-        />
-        Move to Someday (no date)
-      </label>
-      {!someday && (
-        <label>
-          New date
-          <input
-            type="date"
-            required
-            min={earliest}
-            value={toDate}
-            onChange={(event) => setToDate(event.target.value)}
-          />
-        </label>
-      )}
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      <div className="row">
-        <button type="submit" className="primary">
-          Postpone
-        </button>
-        <button type="button" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </form>
+        )}
+        <div className="row wrap-end">
+          <label>
+            New date
+            <input
+              type="date"
+              required={!someday}
+              disabled={someday}
+              min={earliest}
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+          </label>
+          <label className="choice">
+            <input type="checkbox" checked={someday} onChange={(e) => setSomeday(e.target.checked)} />
+            Move to Someday instead
+          </label>
+        </div>
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+        <div className="row">
+          <button type="submit" className="primary">
+            Postpone
+          </button>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -112,7 +109,8 @@ export function SuggestionCard({
 }) {
   const { suggestion } = result
   return (
-    <aside className="card suggestion" aria-label="Suggested fix">
+    <aside className="card suggestion stack" aria-label="Suggested fix">
+      <p className="eyebrow">Postponed · here's how to break the pattern</p>
       <h3>{suggestion.headline}</h3>
       <ul>
         {suggestion.actions.map((action) => (
@@ -120,9 +118,11 @@ export function SuggestionCard({
         ))}
       </ul>
       {suggestion.reflection && <p className="reflection">{suggestion.reflection}</p>}
-      <button type="button" onClick={onDismiss}>
-        Got it
-      </button>
+      <div>
+        <button type="button" onClick={onDismiss}>
+          Got it
+        </button>
+      </div>
     </aside>
   )
 }

@@ -1,10 +1,11 @@
-import type { PostponeResponse, TaskRead } from '@task-master/api-client'
+import type { PostponeResponse } from '@task-master/api-client'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { PostponeForm, SuggestionCard } from '@/screens/PostponeForm'
+import { PostponeDialog, SuggestionCard } from '@/screens/PostponeForm'
 import { findA11yViolations } from '@/test/axe'
+import { makeTask } from '@/test/fixtures'
 import { fail, mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -12,58 +13,70 @@ vi.mock('@/api', async (importOriginal) => ({
   api: (await import('@/test/mockApi')).mockApi,
 }))
 
-const TASK: TaskRead = {
-  id: 't1',
-  goal_id: null,
-  title: 'Write report',
-  next_action: 'Open the doc',
-  estimate_minutes: 30,
-  due_date: '2099-01-10',
-  status: 'todo',
-  postpone_count: 0,
-  completed_at: null,
-  created_at: '2026-11-22T00:00:00Z',
-  updated_at: '2026-11-22T00:00:00Z',
-}
+const TASK = makeTask({ due_date: '2099-01-10' })
 
-function renderForm() {
+function renderDialog() {
   const onPostponed = vi.fn()
-  const view = render(<PostponeForm task={TASK} onPostponed={onPostponed} onCancel={vi.fn()} />)
-  return { onPostponed, ...view }
+  const onClose = vi.fn()
+  const view = render(<PostponeDialog task={TASK} onPostponed={onPostponed} onClose={onClose} />)
+  return { onPostponed, onClose, ...view }
 }
 
 beforeEach(() => {
   mockApi.POST.mockReset()
 })
 
-describe('PostponeForm', () => {
+describe('PostponeDialog', () => {
+  it('opens as a labelled dialog', () => {
+    renderDialog()
+
+    expect(screen.getByRole('dialog', { name: 'Why are you putting this off?' })).toBeInTheDocument()
+  })
+
+  it('offers the reasons as buttons', () => {
+    renderDialog()
+
+    expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(4)
+  })
+
   it('requires a reason before postponing', async () => {
-    renderForm()
+    renderDialog()
 
     await userEvent.click(screen.getByRole('button', { name: 'Postpone' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Pick a reason first.')
   })
 
-  it('asks for a note only when the reason is other', async () => {
-    renderForm()
+  it('marks the chosen reason as pressed', async () => {
+    renderDialog()
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Other…' }))
+    await userEvent.click(screen.getByRole('button', { name: "I don't want to do it" }))
+
+    expect(screen.getByRole('button', { name: "I don't want to do it" })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('asks for a note only when the reason is other', async () => {
+    renderDialog()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Other…' }))
 
     expect(screen.getByRole('textbox', { name: "What's going on?" })).toBeRequired()
   })
 
   it('defaults to the day after the current due date', () => {
-    renderForm()
+    renderDialog()
 
     expect(screen.getByLabelText('New date')).toHaveValue('2099-01-11')
   })
 
   it('sends a dated postponement', async () => {
     mockApi.POST.mockReturnValue(ok({}))
-    renderForm()
+    renderDialog()
 
-    await userEvent.click(screen.getByRole('radio', { name: "I don't know where to start" }))
+    await userEvent.click(screen.getByRole('button', { name: "I don't know where to start" }))
     await userEvent.click(screen.getByRole('button', { name: 'Postpone' }))
 
     expect(mockApi.POST).toHaveBeenCalledWith('/tasks/{task_id}/postpone', {
@@ -74,9 +87,9 @@ describe('PostponeForm', () => {
 
   it('moves to Someday without a date', async () => {
     mockApi.POST.mockReturnValue(ok({}))
-    renderForm()
+    renderDialog()
 
-    await userEvent.click(screen.getByRole('radio', { name: "Something's in the way" }))
+    await userEvent.click(screen.getByRole('button', { name: "Something's in the way" }))
     await userEvent.click(screen.getByRole('checkbox', { name: /Move to Someday/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Postpone' }))
 
@@ -85,18 +98,24 @@ describe('PostponeForm', () => {
 
   it('shows the API error', async () => {
     mockApi.POST.mockReturnValue(fail({ detail: 'A finished task cannot be postponed' }))
-    renderForm()
+    renderDialog()
 
-    await userEvent.click(screen.getByRole('radio', { name: "I don't want to do it" }))
+    await userEvent.click(screen.getByRole('button', { name: "I don't want to do it" }))
     await userEvent.click(screen.getByRole('button', { name: 'Postpone' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'A finished task cannot be postponed',
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('A finished task cannot be postponed')
+  })
+
+  it('closes on Escape', async () => {
+    const { onClose } = renderDialog()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = renderForm()
+    const { container } = renderDialog()
 
     expect(await findA11yViolations(container)).toEqual([])
   })

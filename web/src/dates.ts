@@ -25,3 +25,20 @@ export function formatDay(iso: string): string {
 }
 
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+
+/** Whole days from `from` to `to`, both `YYYY-MM-DD`. */
+export function daysBetween(from: string, to: string): number {
+  const [fy = 0, fm = 1, fd = 1] = from.split('-').map(Number)
+  const [ty = 0, tm = 1, td = 1] = to.split('-').map(Number)
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000)
+}
+
+/** "Today", "Tomorrow", "Overdue · Fri 20 Nov", or the plain day. */
+export function dueLabel(iso: string | null, today: string): string {
+  if (iso === null) return 'Someday'
+  const delta = daysBetween(today, iso)
+  if (delta === 0) return 'Today'
+  if (delta === 1) return 'Tomorrow'
+  if (delta < 0) return `Overdue · ${formatDay(iso)}`
+  return formatDay(iso)
+}

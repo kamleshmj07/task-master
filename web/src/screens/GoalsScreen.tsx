@@ -33,7 +33,7 @@ export function GoalsScreen() {
 
   return (
     <section className="stack" aria-labelledby="goals-heading">
-      <h2 id="goals-heading">Goals</h2>
+      <h1 id="goals-heading">Goals</h1>
       <NewGoalForm onCreated={() => void goals.reload()} />
       <ul className="list">
         {goals.data?.map((goal) => (

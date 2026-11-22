@@ -22,7 +22,7 @@ export function RoutinesScreen() {
 
   return (
     <section className="stack" aria-labelledby="routines-heading">
-      <h2 id="routines-heading">Routines</h2>
+      <h1 id="routines-heading">Routines</h1>
       <p className="muted">
         Routines repeat on a schedule and are ticked off on Today. They are never
         postponed and never take a Top 3 slot.
@@ -37,7 +37,6 @@ export function RoutinesScreen() {
               <p className="meta">
                 {describeSchedule(routine)} · {formatDay(routine.start_date)} –{' '}
                 {formatDay(routine.end_date)}
-                {routine.estimate_minutes ? ` · ${routine.estimate_minutes} min` : ''}
               </p>
             </div>
             <button
@@ -63,7 +62,6 @@ function NewRoutineForm({ onCreated }: { onCreated: () => void }) {
   const [dayOfMonth, setDayOfMonth] = useState('1')
   const [startDate, setStartDate] = useState(todayIso())
   const [endDate, setEndDate] = useState(addDays(todayIso(), 90))
-  const [estimate, setEstimate] = useState('')
   const [goalId, setGoalId] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -81,7 +79,6 @@ function NewRoutineForm({ onCreated }: { onCreated: () => void }) {
         day_of_month: frequency === 'monthly' ? Number(dayOfMonth) : null,
         start_date: startDate,
         end_date: endDate,
-        estimate_minutes: estimate ? Number(estimate) : null,
         goal_id: goalId || null,
       },
     })
@@ -152,16 +149,6 @@ function NewRoutineForm({ onCreated }: { onCreated: () => void }) {
           min={startDate}
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
-        />
-      </label>
-      <label>
-        Estimate (min)
-        <input
-          type="number"
-          min={1}
-          max={1440}
-          value={estimate}
-          onChange={(e) => setEstimate(e.target.value)}
         />
       </label>
       <label>

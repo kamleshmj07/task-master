@@ -63,13 +63,12 @@ export function TodayScreen() {
         <button type="button" aria-label="Previous day" onClick={() => setDay(addDays(day, -1))}>
           ‹
         </button>
-        <h2 id="today-heading">{day === today ? `Today · ${formatDay(day)}` : formatDay(day)}</h2>
+        <h1 id="today-heading">{day === today ? `Today · ${formatDay(day)}` : formatDay(day)}</h1>
         <button type="button" aria-label="Next day" onClick={() => setDay(addDays(day, 1))}>
           ›
         </button>
       </div>
 
-      {plan.data && <CapacityMeter capacity={plan.data.capacity} />}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -77,7 +76,7 @@ export function TodayScreen() {
       )}
 
       <div className="card stack">
-        <h3>Top 3</h3>
+        <h2>Top 3</h2>
         {topThree.length === 0 && <p className="muted">Pick up to three tasks that matter most.</p>}
         <ol className="list">
           {topThree.map(({ rank, task }, index) => (
@@ -91,7 +90,9 @@ export function TodayScreen() {
               />
               <div className="grow">
                 <p className={task.status === 'done' ? 'title done' : 'title'}>{task.title}</p>
-                <p className="muted">Next: {task.next_action}</p>
+                <p className="muted">
+                  Next: {task.next_step ?? 'All steps done'}
+                </p>
               </div>
               {!isPast && (
                 <>
@@ -154,19 +155,6 @@ export function TodayScreen() {
   )
 }
 
-function CapacityMeter({ capacity }: { capacity: PlanRead['capacity'] }) {
-  const { planned_minutes: planned, limit_minutes: limit, over } = capacity
-  return (
-    <div className={over ? 'capacity over' : 'capacity'}>
-      <meter min={0} max={limit} value={Math.min(planned, limit)} aria-label="Planned time" />
-      <p>
-        {planned} of {limit} min planned
-        {over && <strong className="loss"> · over capacity, consider dropping something</strong>}
-      </p>
-    </div>
-  )
-}
-
 interface RoutineChecklistProps {
   day: string
   routines: DueRoutine[]
@@ -184,7 +172,7 @@ function RoutineChecklist({ day, routines, canTick, onChanged }: RoutineChecklis
 
   return (
     <div className="card stack">
-      <h3>Routines</h3>
+      <h2>Routines</h2>
       {routines.length === 0 && <p className="muted">No routines due.</p>}
       <ul className="list">
         {routines.map((due) => (
