@@ -65,6 +65,7 @@ class TestCreateTask:
             "due_date",
             "status",
             "postpone_count",
+            "postponement_reasons",
             "completed_at",
             "created_at",
             "updated_at",

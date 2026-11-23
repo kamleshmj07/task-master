@@ -223,6 +223,19 @@ class Task(TimestampMixin, Base):
         lazy="selectin",
         cascade="all, delete-orphan",
     )
+    # Read-only: postponements are written through their own table and go
+    # with the task through the database's ON DELETE CASCADE.
+    postponements: Mapped[list[TaskPostponement]] = relationship(
+        lazy="selectin", viewonly=True
+    )
+
+    @property
+    def postponement_reasons(self) -> dict[PostponeReason, int]:
+        """How many times the task was postponed for each reason."""
+        counts: dict[PostponeReason, int] = {}
+        for postponement in self.postponements:
+            counts[postponement.reason] = counts.get(postponement.reason, 0) + 1
+        return counts
 
 
 class TaskStep(Base):

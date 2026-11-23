@@ -80,8 +80,8 @@ class GoalUpdate(PatchModel):
     status: GoalStatus | None = None
 
 
-class GoalRead(BaseModel):
-    """A goal as returned by the API."""
+class GoalSummary(BaseModel):
+    """A goal's own fields."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,6 +92,31 @@ class GoalRead(BaseModel):
     status: GoalStatus
     created_at: datetime
     updated_at: datetime
+
+
+class NextDueTask(BaseModel):
+    """The soonest-due open task under a goal."""
+
+    id: uuid.UUID
+    title: str
+    due_date: date
+
+
+class GoalProgress(BaseModel):
+    """How far a goal has come, and whether it is moving."""
+
+    total_tasks: int
+    done_tasks: int
+    routine_count: int
+    next_due_task: NextDueTask | None
+    # Last edit to the goal, change to one of its tasks, or step ticked.
+    last_moved_at: datetime
+
+
+class GoalRead(GoalSummary):
+    """A goal as returned by the API, with its progress."""
+
+    progress: GoalProgress
 
 
 class TaskCreate(BaseModel):
@@ -201,6 +226,8 @@ class TaskRead(BaseModel):
     due_date: date | None
     status: TaskStatus
     postpone_count: int
+    # How many times it was postponed for each reason, e.g. {"blocked": 2}.
+    postponement_reasons: dict[PostponeReason, int]
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime

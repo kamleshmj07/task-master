@@ -745,7 +745,7 @@
           "goals"
         ],
         "summary": "Handle List Goals",
-        "description": "List goals, oldest first, optionally filtered by status.",
+        "description": "List goals with their progress, oldest first, optionally by status.",
         "operationId": "handle_list_goals_goals_get",
         "security": [
           {
@@ -827,7 +827,7 @@
           "goals"
         ],
         "summary": "Handle Get Goal",
-        "description": "Return one goal.",
+        "description": "Return one goal with its progress.",
         "operationId": "handle_get_goal_goals__goal_id__get",
         "security": [
           {
@@ -931,7 +931,7 @@
           "goals"
         ],
         "summary": "Handle Delete Goal",
-        "description": "Delete a goal and, by cascade, its tasks.",
+        "description": "Delete a goal and, by cascade, its tasks and routines.",
         "operationId": "handle_delete_goal_goals__goal_id__delete",
         "security": [
           {
@@ -2740,6 +2740,47 @@
         "title": "GoalCreate",
         "description": "New goal."
       },
+      "GoalProgress": {
+        "properties": {
+          "total_tasks": {
+            "type": "integer",
+            "title": "Total Tasks"
+          },
+          "done_tasks": {
+            "type": "integer",
+            "title": "Done Tasks"
+          },
+          "routine_count": {
+            "type": "integer",
+            "title": "Routine Count"
+          },
+          "next_due_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextDueTask"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_moved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Moved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_tasks",
+          "done_tasks",
+          "routine_count",
+          "next_due_task",
+          "last_moved_at"
+        ],
+        "title": "GoalProgress",
+        "description": "How far a goal has come, and whether it is moving."
+      },
       "GoalRead": {
         "properties": {
           "id": {
@@ -2786,6 +2827,9 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/GoalProgress"
           }
         },
         "type": "object",
@@ -2796,10 +2840,11 @@
           "deadline",
           "status",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "progress"
         ],
         "title": "GoalRead",
-        "description": "A goal as returned by the API."
+        "description": "A goal as returned by the API, with its progress."
       },
       "GoalStatus": {
         "type": "string",
@@ -2892,6 +2937,32 @@
         ],
         "title": "HealthResponse",
         "description": "Health check payload."
+      },
+      "NextDueTask": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "due_date"
+        ],
+        "title": "NextDueTask",
+        "description": "The soonest-due open task under a goal."
       },
       "NotificationKind": {
         "type": "string",
@@ -3726,6 +3797,16 @@
             "type": "integer",
             "title": "Postpone Count"
           },
+          "postponement_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/PostponeReason"
+            },
+            "type": "object",
+            "title": "Postponement Reasons"
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -3772,6 +3853,7 @@
           "due_date",
           "status",
           "postpone_count",
+          "postponement_reasons",
           "completed_at",
           "created_at",
           "updated_at",

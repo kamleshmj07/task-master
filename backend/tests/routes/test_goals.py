@@ -68,6 +68,7 @@ class TestCreateGoal:
             "status",
             "created_at",
             "updated_at",
+            "progress",
         }
 
     async def test_strips_title_whitespace(
@@ -260,3 +261,120 @@ class TestDeleteGoal:
         response = await api_client.delete(f"/goals/{goal['id']}", headers=auth_headers)
 
         assert response.status_code == 404
+
+
+async def add_task(
+    client: AsyncClient, headers: Headers, goal_id: str, **fields: Any
+) -> dict[str, Any]:
+    response = await client.post(
+        "/tasks",
+        json={"title": "T", "steps": ["Go"], "goal_id": goal_id, **fields},
+        headers=headers,
+    )
+    return response.json()
+
+
+class TestGoalProgress:
+    async def test_new_goal_has_nothing_yet(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+
+        progress = goal["progress"]
+
+        assert (
+            progress["total_tasks"],
+            progress["done_tasks"],
+            progress["routine_count"],
+            progress["next_due_task"],
+        ) == (0, 0, 0, None)
+
+    async def test_counts_tasks_and_finished_ones(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+        done = await add_task(api_client, auth_headers, goal["id"])
+        await add_task(api_client, auth_headers, goal["id"])
+        await api_client.patch(
+            f"/tasks/{done['id']}", json={"status": "done"}, headers=auth_headers
+        )
+
+        response = await api_client.get(f"/goals/{goal['id']}", headers=auth_headers)
+
+        progress = response.json()["progress"]
+        assert (progress["total_tasks"], progress["done_tasks"]) == (2, 1)
+
+    async def test_names_the_soonest_open_task(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+        await add_task(
+            api_client, auth_headers, goal["id"], title="Later", due_date="2099-02-01"
+        )
+        await add_task(
+            api_client, auth_headers, goal["id"], title="Sooner", due_date="2099-01-01"
+        )
+        await add_task(api_client, auth_headers, goal["id"], title="Undated")
+
+        response = await api_client.get(f"/goals/{goal['id']}", headers=auth_headers)
+
+        assert response.json()["progress"]["next_due_task"]["title"] == "Sooner"
+
+    async def test_counts_routines(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+        await api_client.post(
+            "/routines",
+            json={
+                "title": "Run",
+                "frequency": "daily",
+                "start_date": "2026-01-01",
+                "end_date": "2026-12-31",
+                "goal_id": goal["id"],
+            },
+            headers=auth_headers,
+        )
+
+        response = await api_client.get(f"/goals/{goal['id']}", headers=auth_headers)
+
+        assert response.json()["progress"]["routine_count"] == 1
+
+    async def test_lists_progress_for_every_goal(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        first = await create_goal(api_client, auth_headers, title="First")
+        await create_goal(api_client, auth_headers, title="Second")
+        await add_task(api_client, auth_headers, first["id"])
+
+        response = await api_client.get("/goals", headers=auth_headers)
+
+        totals = {g["title"]: g["progress"]["total_tasks"] for g in response.json()}
+        assert (totals["First"], totals["Second"]) == (1, 0)
+
+    async def test_editing_keeps_progress(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+        await add_task(api_client, auth_headers, goal["id"])
+
+        response = await api_client.patch(
+            f"/goals/{goal['id']}",
+            json={"title": "Run a half", "why": "Build up", "deadline": "2099-05-01"},
+            headers=auth_headers,
+        )
+
+        updated = response.json()
+        assert updated["title"] == "Run a half"
+        assert updated["progress"]["total_tasks"] == 1
+
+    async def test_deleting_a_goal_deletes_its_tasks(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+        task = await add_task(api_client, auth_headers, goal["id"])
+
+        await api_client.delete(f"/goals/{goal['id']}", headers=auth_headers)
+
+        gone = await api_client.get(f"/tasks/{task['id']}", headers=auth_headers)
+        assert gone.status_code == 404

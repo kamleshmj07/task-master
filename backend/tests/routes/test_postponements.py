@@ -296,3 +296,47 @@ class TestSomeday:
         )
 
         assert response.json()["due_date"] == LATEST
+
+
+class TestReasonCounts:
+    async def test_new_task_has_none(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+
+        assert task["postponement_reasons"] == {}
+
+    async def test_counts_each_reason(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+        await postpone(api_client, auth_headers, task["id"], "blocked", "2099-01-11")
+        await postpone(api_client, auth_headers, task["id"], "blocked", "2099-01-12")
+        response = await postpone(
+            api_client, auth_headers, task["id"], "dreading", "2099-01-13"
+        )
+
+        assert response.json()["task"]["postponement_reasons"] == {
+            "blocked": 2,
+            "dreading": 1,
+        }
+
+    async def test_lists_include_the_counts(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+        await postpone(api_client, auth_headers, task["id"], "stuck")
+
+        listed = await api_client.get(f"/tasks/{task['id']}", headers=auth_headers)
+
+        assert listed.json()["postponement_reasons"] == {"stuck": 1}
+
+    async def test_deleting_a_task_deletes_its_history(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await new_task(api_client, auth_headers)
+        await postpone(api_client, auth_headers, task["id"], "stuck")
+
+        response = await api_client.delete(f"/tasks/{task['id']}", headers=auth_headers)
+
+        assert response.status_code == 204

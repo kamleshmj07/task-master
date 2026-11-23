@@ -41,7 +41,7 @@ data: another user's goal, task or routine is reported as `404`. Lists take
 
 | Route | Purpose |
 | --- | --- |
-| `GET/POST /goals`, `GET/PATCH/DELETE /goals/{id}` | Goals; deleting one deletes its tasks |
+| `GET/POST /goals`, `GET/PATCH/DELETE /goals/{id}` | Goals with their progress; deleting one deletes its tasks and routines |
 | `GET/POST /tasks`, `GET/PATCH/DELETE /tasks/{id}` | Tasks; filter by `view`, `status`, `someday`, `goal_id`, `no_goal` |
 | `GET /tasks/counts` | Totals per view (Scheduled, Review, Someday, Done) for the same goal filters |
 | `POST /tasks/{id}/steps`, `PATCH/DELETE /tasks/{id}/steps/{step_id}` | Add, rename, tick or remove steps; a task keeps at least one |
@@ -130,7 +130,8 @@ the API must share a registrable domain (e.g. `app.example.com` and
 
 Finished tasks stay under Done for 90 days
 (`TASK_MASTER_COMPLETED_TASK_RETENTION_DAYS`), then a clean-up job deletes
-them together with their steps, postponements and plan slots. Read
+them together with their steps, postponements and plan slots. Finished tasks
+of an active goal are kept until the goal is completed or archived. Read
 notifications older than that are deleted too; unread ones and open tasks are
 never deleted. Run it once a day from cron, Windows Task Scheduler or your
 platform's scheduler:

@@ -214,7 +214,7 @@ export interface paths {
         };
         /**
          * Handle List Goals
-         * @description List goals, oldest first, optionally filtered by status.
+         * @description List goals with their progress, oldest first, optionally by status.
          */
         get: operations["handle_list_goals_goals_get"];
         put?: never;
@@ -238,14 +238,14 @@ export interface paths {
         };
         /**
          * Handle Get Goal
-         * @description Return one goal.
+         * @description Return one goal with its progress.
          */
         get: operations["handle_get_goal_goals__goal_id__get"];
         put?: never;
         post?: never;
         /**
          * Handle Delete Goal
-         * @description Delete a goal and, by cascade, its tasks.
+         * @description Delete a goal and, by cascade, its tasks and routines.
          */
         delete: operations["handle_delete_goal_goals__goal_id__delete"];
         options?: never;
@@ -771,8 +771,26 @@ export interface components {
             deadline?: string | null;
         };
         /**
+         * GoalProgress
+         * @description How far a goal has come, and whether it is moving.
+         */
+        GoalProgress: {
+            /** Total Tasks */
+            total_tasks: number;
+            /** Done Tasks */
+            done_tasks: number;
+            /** Routine Count */
+            routine_count: number;
+            next_due_task: components["schemas"]["NextDueTask"] | null;
+            /**
+             * Last Moved At
+             * Format: date-time
+             */
+            last_moved_at: string;
+        };
+        /**
          * GoalRead
-         * @description A goal as returned by the API.
+         * @description A goal as returned by the API, with its progress.
          */
         GoalRead: {
             /**
@@ -797,6 +815,7 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            progress: components["schemas"]["GoalProgress"];
         };
         /**
          * GoalStatus
@@ -832,6 +851,24 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * NextDueTask
+         * @description The soonest-due open task under a goal.
+         */
+        NextDueTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
         };
         /**
          * NotificationKind
@@ -1158,6 +1195,10 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             /** Postpone Count */
             postpone_count: number;
+            /** Postponement Reasons */
+            postponement_reasons: {
+                [key: string]: number;
+            };
             /** Completed At */
             completed_at: string | null;
             /**
