@@ -86,9 +86,13 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   gone once acknowledged.
   `PATCH /tasks/{id}` refuses to move a date later or clear it, so nothing
   skips postponement. Each task carries `postponement_reasons` (counts per
-  reason); the web shows "Postponed 3 times: 2 blocked, 1 dreading" and the
-  full history when a task is expanded. Moving a date earlier is a plain edit and is not logged.
-- **Routines** repeat daily, weekly on chosen weekdays, or monthly on a day
+  reason); the web shows "Postponed 3 times: 2 blocked, 1 dreading", and the
+  full history only when asked ("Show postponement history").
+- A finished task's steps are read-only: no adding, removing, reordering or
+  ticking. Top 3 tasks on Today expand to the same step checklist. Moving a date earlier is a plain edit and is not logged.
+- **Routines** are independent chores without steps (decided: no steps). They
+  have an optional time limit (each time due), and repeat
+  daily, weekly on chosen weekdays, or monthly on a day
   (29th to 31st fall back to the month's last day), between a required start
   and end date. Ticked per day with a streak; never postponed; never in the
   Top 3.
