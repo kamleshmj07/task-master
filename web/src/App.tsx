@@ -1,26 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
+import type { PostponeReason } from '@task-master/api-client'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AuthProvider } from '@/auth'
 import { useAuth } from '@/authContext'
 import { NotificationBell } from '@/components/NotificationBell'
+import { type Navigation, NavigationContext, type ScreenName } from '@/navigation'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { GoalsScreen } from '@/screens/GoalsScreen'
 import { RoutinesScreen } from '@/screens/RoutinesScreen'
 import { SettingsScreen } from '@/screens/SettingsScreen'
 import { TasksScreen } from '@/screens/TasksScreen'
+import { TipsScreen } from '@/screens/TipsScreen'
 import { TodayScreen } from '@/screens/TodayScreen'
 import { WelcomeDialog } from '@/screens/WelcomeDialog'
 
-const SCREENS = {
+interface Route {
+  screen: ScreenName
+  tip?: PostponeReason | undefined
+}
+
+const SCREENS: Record<ScreenName, { label: string; render: (route: Route) => ReactNode }> = {
   today: { label: 'Today', render: () => <TodayScreen /> },
   tasks: { label: 'Tasks', render: () => <TasksScreen /> },
   routines: { label: 'Routines', render: () => <RoutinesScreen /> },
   goals: { label: 'Goals', render: () => <GoalsScreen /> },
+  tips: { label: 'Tips', render: (route) => <TipsScreen key={route.tip ?? 'all'} initialTip={route.tip} /> },
   settings: { label: 'Settings', render: () => <SettingsScreen /> },
-} as const
+}
 
-type ScreenName = keyof typeof SCREENS
-const NAV: ScreenName[] = ['today', 'tasks', 'routines', 'goals']
+const NAV: ScreenName[] = ['today', 'tasks', 'routines', 'goals', 'tips']
 
 /** Application root: the session, then either sign-in or the main app. */
 export function App() {
@@ -33,7 +41,12 @@ export function App() {
 
 function Shell() {
   const { user, loading } = useAuth()
-  const [screen, setScreen] = useState<ScreenName>('today')
+  const [route, setRoute] = useState<Route>({ screen: 'today' })
+  const navigation = useMemo<Navigation>(
+    () => ({ go: (screen, options) => setRoute({ screen, tip: options?.tip }) }),
+    [],
+  )
+  const screen = route.screen
 
   if (loading) return <p className="app muted">Loading…</p>
   if (!user) return <AuthScreen />
@@ -56,7 +69,7 @@ function Shell() {
                 key={name}
                 type="button"
                 aria-current={screen === name ? 'page' : undefined}
-                onClick={() => setScreen(name)}
+                onClick={() => navigation.go(name)}
               >
                 {SCREENS[name].label}
               </button>
@@ -66,11 +79,13 @@ function Shell() {
           <AccountMenu
             email={user.email}
             name={user.display_name ?? null}
-            onSettings={() => setScreen('settings')}
+            onSettings={() => navigation.go('settings')}
           />
         </div>
       </header>
-      <main className="app">{SCREENS[screen].render()}</main>
+      <NavigationContext.Provider value={navigation}>
+        <main className="app">{SCREENS[screen].render(route)}</main>
+      </NavigationContext.Provider>
       {!user.display_name && <WelcomeDialog />}
     </div>
   )

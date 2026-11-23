@@ -1,3 +1,4 @@
+import { Field } from '@/components/Field'
 import { timezoneOptions } from '@/dates'
 
 interface ProfileFieldsProps {
@@ -11,28 +12,30 @@ interface ProfileFieldsProps {
 export function ProfileFields({ name, timezone, onNameChange, onTimezoneChange }: ProfileFieldsProps) {
   return (
     <>
-      <label>
-        Your name
-        <input
-          required
-          maxLength={100}
-          autoComplete="name"
-          placeholder="What should we call you?"
-          value={name}
-          onChange={(e) => onNameChange(e.target.value)}
-        />
-      </label>
-      <label>
-        <span>Timezone</span>
-        <span className="hint">Decides when your day starts.</span>
-        <select required value={timezone} onChange={(e) => onTimezoneChange(e.target.value)}>
-          {timezoneOptions(timezone).map((zone) => (
-            <option key={zone} value={zone}>
-              {zone.replaceAll('_', ' ')}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Field label="Your name">
+        {(id) => (
+          <input
+            id={id}
+            required
+            maxLength={100}
+            autoComplete="name"
+            placeholder="What should we call you?"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+          />
+        )}
+      </Field>
+      <Field label="Timezone" info="Decides when your day starts and ends, so Today, due dates and routine ticks match your local time.">
+        {(id) => (
+          <select id={id} required value={timezone} onChange={(e) => onTimezoneChange(e.target.value)}>
+            {timezoneOptions(timezone).map((zone) => (
+              <option key={zone} value={zone}>
+                {zone.replaceAll('_', ' ')}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
     </>
   )
 }

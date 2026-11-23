@@ -6,10 +6,9 @@ import { Modal } from '@/components/Modal'
 import { groupReview, groupScheduled, loadGoals, type TaskGroup } from '@/data'
 import { todayIso } from '@/dates'
 import { NewTaskPanel } from '@/screens/NewTaskPanel'
-import { PostponeDialog, SuggestionCard } from '@/screens/PostponeForm'
+import { PostponeDialog, TipDialog } from '@/screens/PostponeForm'
 import { TaskCard } from '@/screens/TaskCard'
 import { type GoalFilter, type TaskView as View, usePagedTasks } from '@/usePagedTasks'
-import { announceNotificationsChanged } from '@/notifications'
 import { useResource } from '@/useResource'
 
 const VIEWS: { id: View; label: string }[] = [
@@ -99,7 +98,7 @@ export function TasksScreen() {
         </div>
       )}
       {suggestion && (
-        <SuggestionCard
+        <TipDialog
           result={suggestion}
           onDismiss={() => setSuggestion(null)}
           onOpenSteps={() => {
@@ -205,7 +204,6 @@ export function TasksScreen() {
           onPostponed={(result) => {
             setPostponing(null)
             setSuggestion(result)
-            announceNotificationsChanged()
             void tasks.reload()
           }}
         />

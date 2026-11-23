@@ -5,6 +5,8 @@ import { api, errorMessage } from '@/api'
 import { Modal } from '@/components/Modal'
 import { REASONS } from '@/data'
 import { addDays, formatDay, quickDates, todayIso } from '@/dates'
+import { useNavigation } from '@/navigation'
+import { tipArticle } from '@/tips'
 
 type Target = { kind: 'date'; date: string } | { kind: 'pick' } | { kind: 'someday' }
 
@@ -148,37 +150,38 @@ const REASON_ICONS: Record<PostponeReason, string> = {
   other: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 5v5m0 3h.01',
 }
 
-interface SuggestionCardProps {
+interface TipDialogProps {
   result: PostponeResponse
   onDismiss: () => void
   /** Opens the task's steps, for fixes that start there. */
   onOpenSteps?: () => void
 }
 
-/** Coaching after a postponement: a checklist of fixes for the reason given. */
-export function SuggestionCard({ result, onDismiss, onOpenSteps }: SuggestionCardProps) {
+/**
+ * Shown once after postponing: the fix for the reason given, and a way into
+ * the full guide. It is not saved anywhere; it is gone once dismissed.
+ */
+export function TipDialog({ result, onDismiss, onOpenSteps }: TipDialogProps) {
   const { suggestion, postponement, task } = result
+  const { go } = useNavigation()
   const [tried, setTried] = useState<string[]>([])
   const where = postponement.to_date ? formatDay(postponement.to_date) : 'Someday'
   const startsWithSteps = postponement.reason === 'stuck' || postponement.reason === 'dreading'
+  const guide = tipArticle(postponement.reason)
 
   return (
-    <aside className="coach" aria-label="Suggested fix">
-      <div className="coach-head">
+    <Modal title={suggestion.headline} onClose={onDismiss}>
+      <div className="tip-intro">
         <span className="coach-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d={REASON_ICONS[postponement.reason]} />
           </svg>
         </span>
-        <div className="grow">
-          <p className="muted small">
-            Moved “{task.title}” to {where}. Saved to your notifications.
-          </p>
-          <h3>{suggestion.headline}</h3>
-        </div>
+        <p className="muted">
+          Moved “{task.title}” to {where}. Try one of these before it comes back.
+        </p>
       </div>
-      <p className="muted small">Try one of these before it comes back.</p>
-      <ul className="list">
+      <ul className="list tip-actions">
         {suggestion.actions.map((action) => (
           <li key={action}>
             <label className="choice">
@@ -195,23 +198,39 @@ export function SuggestionCard({ result, onDismiss, onOpenSteps }: SuggestionCar
         ))}
       </ul>
       {suggestion.reflection && (
-        <p className="reflection" role="note">
+        <p className="reflection tip-reflection" role="note">
           {suggestion.reflection}
         </p>
       )}
-      <div className="row end">
-        <div className="row">
-          {startsWithSteps && onOpenSteps && (
-            <button type="button" className="primary" onClick={onOpenSteps}>
-              Open steps
+      {guide && (
+        <div className="tip-guide">
+          <p className="field-label">From the guide: {guide.title}</p>
+          <p className="muted small">{guide.summary}</p>
+          <div>
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                onDismiss()
+                go('tips', { tip: postponement.reason })
+              }}
+            >
+              Read the guide with examples
             </button>
-          )}
-          <button type="button" onClick={onDismiss}>
-            Got it
-          </button>
+          </div>
         </div>
+      )}
+      <div className="row">
+        <button type="button" className="primary" onClick={onDismiss}>
+          Got it
+        </button>
+        {startsWithSteps && onOpenSteps && (
+          <button type="button" onClick={onOpenSteps}>
+            Open steps
+          </button>
+        )}
       </div>
-    </aside>
+    </Modal>
   )
 }
 

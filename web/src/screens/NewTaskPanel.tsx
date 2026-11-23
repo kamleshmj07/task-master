@@ -2,6 +2,7 @@ import type { GoalRead } from '@task-master/api-client'
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { Field, FieldGroup } from '@/components/Field'
 import { CloseIcon } from '@/components/Modal'
 import { TimeLimitField } from '@/components/TimeLimitField'
 import { type TimeUnit, toMinutes } from '@/data'
@@ -67,14 +68,23 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
         </button>
       </div>
 
-      <label>
-        Task
-        <input required maxLength={200} placeholder="e.g. Renew car insurance" value={title} onChange={(e) => setTitle(e.target.value)} />
-      </label>
+      <Field label="Task">
+        {(id) => (
+          <input
+            id={id}
+            required
+            maxLength={200}
+            placeholder="e.g. Renew car insurance"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        )}
+      </Field>
 
-      <fieldset className="plain stack-sm">
-        <legend>Steps</legend>
-        <p className="hint">Start with the very first physical action. You can add more later.</p>
+      <FieldGroup
+        label="Steps"
+        info="Start with the very first physical action, small enough to begin right away. The first unfinished step is always shown as the task's next step. You can add, reorder and tick steps later."
+      >
         {steps.map((step, index) => (
           <div key={index} className="row nowrap">
             <span className="step-number" aria-hidden="true">
@@ -106,22 +116,23 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
             + Add step
           </button>
         </div>
-      </fieldset>
+      </FieldGroup>
 
       <div className="grid">
         <div className="stack-sm">
-          <label>
-            Goal
-            <select value={goalId} onChange={(e) => setGoalId(e.target.value)}>
-              <option value="">No goal</option>
-              {goals.map((goal) => (
-                <option key={goal.id} value={goal.id}>
-                  {goal.title}
-                </option>
-              ))}
-              <option value={NEW_GOAL}>+ New goal…</option>
-            </select>
-          </label>
+          <Field label="Goal" info="The outcome this task moves you toward. Optional: everyday chores can stay goal-less or go under Essentials.">
+            {(id) => (
+              <select id={id} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
+                <option value="">No goal</option>
+                {goals.map((goal) => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.title}
+                  </option>
+                ))}
+                <option value={NEW_GOAL}>+ New goal…</option>
+              </select>
+            )}
+          </Field>
           {creatingGoal && (
             <div className="row nowrap">
               <input
@@ -144,11 +155,9 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
           onAmountChange={setLimitAmount}
           onUnitChange={setLimitUnit}
         />
-        <label>
-          <span>Due date</span>
-          <span className="hint">Leave empty to keep it in Someday.</span>
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </label>
+        <Field label="Due date" info="Leave it empty to keep the task in Someday. Moving a date later is a postponement, so it asks why.">
+          {(id) => <input id={id} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />}
+        </Field>
       </div>
 
       {error && (
