@@ -157,7 +157,7 @@ artifact (artboard "Tasks page – Desk lamp direction").
   `master` (e.g. `feature/today-page`) and wait for the user's OK. Each
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
-  `C:\dev\.claudeulesackend.md` is temporarily switched off.
+  `C:\dev\.claude\rules\backend.md` is temporarily switched off.
 - Dev database migrated to `30bcd4c2b5e5` (head).
 - Tests: 404 backend (98% coverage), 116 web, 3 api-client, all passing.
 
