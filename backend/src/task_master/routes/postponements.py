@@ -10,7 +10,6 @@ from sqlalchemy import func, select, update
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import NowDep, SessionDep, local_today
 from task_master.models import (
-    Notification,
     PostponeReason,
     Task,
     TaskPostponement,
@@ -58,19 +57,8 @@ async def handle_postpone_task(
     await session.refresh(task)
     await session.refresh(postponement)
     blocked_count = await _count_blocked(session, task.id)
+    # The tip is shown once and dismissed; it is deliberately not stored.
     suggestion = suggest(body.reason, blocked_count)
-    session.add(
-        Notification(
-            user_id=user.id,
-            task_id=task.id,
-            task_title=task.title,
-            reason=body.reason,
-            headline=suggestion.headline,
-            actions=list(suggestion.actions),
-            reflection=suggestion.reflection,
-        )
-    )
-    await session.commit()
     return PostponeResponse(
         task=TaskRead.model_validate(task),
         postponement=PostponementRead.model_validate(postponement),
