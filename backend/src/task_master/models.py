@@ -343,6 +343,7 @@ class Routine(TimestampMixin, Base):
         ),
         UniqueConstraint("id", "user_id"),
         CheckConstraint("end_date >= start_date", name="ends_after_start"),
+        CheckConstraint("time_limit_minutes > 0", name="time_limit_positive"),
         CheckConstraint(
             "(frequency = 'weekly') = (weekdays IS NOT NULL)", name="weekly_has_days"
         ),
@@ -364,6 +365,8 @@ class Routine(TimestampMixin, Base):
     )
     goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     title: Mapped[str] = mapped_column(String(200))
+    # Most time to spend each time it is due, like a task's time limit.
+    time_limit_minutes: Mapped[int | None]
     frequency: Mapped[RoutineFrequency] = mapped_column(_enum_column(RoutineFrequency))
     # ISO weekday numbers minus one: 0 = Monday ... 6 = Sunday.
     weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))

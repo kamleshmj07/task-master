@@ -1019,6 +1019,8 @@ export interface components {
             title: string;
             /** Goal Id */
             goal_id?: string | null;
+            /** Time Limit Minutes */
+            time_limit_minutes?: number | null;
         };
         /**
          * RoutineFrequency
@@ -1040,6 +1042,8 @@ export interface components {
             goal_id: string | null;
             /** Title */
             title: string;
+            /** Time Limit Minutes */
+            time_limit_minutes: number | null;
             frequency: components["schemas"]["RoutineFrequency"];
             /** Weekdays */
             weekdays: number[] | null;
@@ -1075,6 +1079,8 @@ export interface components {
             title?: string | null;
             /** Goal Id */
             goal_id?: string | null;
+            /** Time Limit Minutes */
+            time_limit_minutes?: number | null;
             frequency?: components["schemas"]["RoutineFrequency"] | null;
             /** Weekdays */
             weekdays?: number[] | null;

@@ -3312,6 +3312,19 @@
               }
             ],
             "title": "Goal Id"
+          },
+          "time_limit_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Minutes"
           }
         },
         "type": "object",
@@ -3356,6 +3369,17 @@
           "title": {
             "type": "string",
             "title": "Title"
+          },
+          "time_limit_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Minutes"
           },
           "frequency": {
             "$ref": "#/components/schemas/RoutineFrequency"
@@ -3411,6 +3435,7 @@
           "id",
           "goal_id",
           "title",
+          "time_limit_minutes",
           "frequency",
           "weekdays",
           "day_of_month",
@@ -3448,6 +3473,19 @@
               }
             ],
             "title": "Goal Id"
+          },
+          "time_limit_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Minutes"
           },
           "frequency": {
             "anyOf": [

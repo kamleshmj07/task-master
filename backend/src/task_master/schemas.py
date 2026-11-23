@@ -367,6 +367,7 @@ class RoutineCreate(RoutineSchedule):
 
     title: Title
     goal_id: uuid.UUID | None = None
+    time_limit_minutes: TimeLimitMinutes | None = None
 
 
 class RoutineUpdate(PatchModel):
@@ -376,6 +377,7 @@ class RoutineUpdate(PatchModel):
 
     title: Title | None = None
     goal_id: uuid.UUID | None = None
+    time_limit_minutes: TimeLimitMinutes | None = None
     frequency: RoutineFrequency | None = None
     weekdays: list[Weekday] | None = None
     day_of_month: DayOfMonth | None = None
@@ -391,6 +393,7 @@ class RoutineRead(BaseModel):
     id: uuid.UUID
     goal_id: uuid.UUID | None
     title: str
+    time_limit_minutes: int | None
     frequency: RoutineFrequency
     weekdays: list[int] | None
     day_of_month: int | None
