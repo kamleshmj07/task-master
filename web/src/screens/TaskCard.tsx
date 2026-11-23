@@ -2,6 +2,7 @@ import type { TaskRead } from '@task-master/api-client'
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { InfoTip } from '@/components/InfoTip'
 import { timeLimitLabel } from '@/data'
 import { daysBetween, dueLabel } from '@/dates'
 
@@ -32,7 +33,7 @@ export function TaskCard({
   const ready = !done && task.next_step === null
   const limit = timeLimitLabel(task.time_limit_minutes)
   const rail = overdue ? 'rail loss' : ready ? 'rail gain' : 'rail'
-  const next = done ? 'Completed' : ready ? 'Every step is done' : `Next: ${task.next_step}`
+  const settled = done ? 'Completed' : 'Every step is done'
 
   async function handleToggleTask() {
     const { data } = await api.PATCH('/tasks/{task_id}', {
@@ -56,7 +57,6 @@ export function TaskCard({
         <div className="grow">
           <button type="button" className="unstyled task-title" aria-expanded={open} onClick={onToggleOpen}>
             <span className={done ? 'title done' : 'title'}>{task.title}</span>
-            <span className={done || ready ? 'next-step settled' : 'next-step'}>{next}</span>
           </button>
           <div className="facts">
             <span className={overdue ? 'loss strong' : undefined}>{dueLabel(task.due_date, today)}</span>
@@ -71,6 +71,16 @@ export function TaskCard({
               </span>
             )}
           </div>
+          <p className={done || ready ? 'next-block settled' : 'next-block'}>
+            {done || ready ? (
+              settled
+            ) : (
+              <>
+                <span className="next-label">Next step</span>
+                <span className="next-text">{task.next_step}</span>
+              </>
+            )}
+          </p>
         </div>
         <div className="row nowrap">
           {!done && (
@@ -164,7 +174,15 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
 
   return (
     <div className="steps">
-      {canReorder && <p className="hint">Drag a step by its handle to reorder it.</p>}
+      <div className="row">
+        <h3 className="steps-title">Steps</h3>
+        {canReorder && (
+          <InfoTip label="Reordering steps">
+            Drag a step by its handle to move it, or focus the handle and press the up and down
+            arrow keys.
+          </InfoTip>
+        )}
+      </div>
       <ol className="trail" aria-label={`Steps for “${task.title}”`}>
         {task.steps.map((step, index) => (
           <li

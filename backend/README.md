@@ -52,13 +52,17 @@ data: another user's goal, task or routine is reported as `404`. Lists take
 | `GET /routines/due?on=` | Routines due on a day, with done flag and streak |
 | `PUT/DELETE /routines/{id}/completions/{day}` | Tick a routine off for a day, or undo it |
 | `GET/PUT /plans/{date}` | A day's Top 3 tasks, shown beside its routines |
-| `GET /notifications`, `GET /notifications/unread-count` | Saved postpone tips, newest first |
-| `POST /notifications/{id}/read`, `POST /notifications/read-all` | Mark tips as read |
+| `POST /notifications/check` | Create any notifications now due, return the unread count; called when the app opens |
+| `GET /notifications`, `GET /notifications/unread-count` | Notifications, newest first |
+| `POST /notifications/{id}/read`, `POST /notifications/read-all` | Mark notifications as read |
 | `DELETE /users/me` | Delete the account and all its data; needs the current password |
 
 Each open task is in exactly one view: **Review** if every step is done or
 its due date has passed, otherwise **Scheduled** (dated) or **Someday**
-(undated). Postponing a task also saves its suggested fix as a notification.
+(undated). The fix returned by `/postpone` is shown once by the client and is
+not stored. Notifications cover goal deadlines within 7 days, goals whose tasks
+are all done, goals quiet for 30 days, and one daily summary of tasks due in
+the next 3 days; each event is notified once.
 
 A task's due date can be brought forward with `PATCH`, but moving it later or
 clearing it must go through `/postpone`, so every deferral is recorded.
@@ -126,7 +130,8 @@ the API must share a registrable domain (e.g. `app.example.com` and
 
 Finished tasks stay under Done for 90 days
 (`TASK_MASTER_COMPLETED_TASK_RETENTION_DAYS`), then a clean-up job deletes
-them together with their steps, postponements and plan slots. Open tasks are
+them together with their steps, postponements and plan slots. Read
+notifications older than that are deleted too; unread ones and open tasks are
 never deleted. Run it once a day from cron, Windows Task Scheduler or your
 platform's scheduler:
 

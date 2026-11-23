@@ -1,4 +1,4 @@
-"""Notification endpoints: the saved tips behind the bell."""
+"""Notification endpoints: goal updates and upcoming tasks, behind the bell."""
 
 import uuid
 from typing import Annotated
@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select, update
 
+from task_master.alerts import check_notifications
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import NowDep, SessionDep
 from task_master.models import Notification
@@ -34,6 +35,19 @@ async def handle_list_notifications(
     )
     rows = await session.scalars(statement)
     return [NotificationRead.model_validate(row) for row in rows]
+
+
+@router.post("/check")
+async def handle_check_notifications(
+    user: CurrentUserDep, session: SessionDep, now: NowDep
+) -> UnreadCount:
+    """Create any notifications now due, then return the unread count.
+
+    Clients call this when the app opens. Repeating it is harmless: each
+    event is notified once.
+    """
+    await check_notifications(session, user, now)
+    return await handle_count_unread(user, session)
 
 
 @router.get("/unread-count")

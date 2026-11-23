@@ -2362,6 +2362,33 @@
         }
       }
     },
+    "/notifications/check": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Handle Check Notifications",
+        "description": "Create any notifications now due, then return the unread count.\n\nClients call this when the app opens. Repeating it is harmless: each\nevent is notified once.",
+        "operationId": "handle_check_notifications_notifications_check_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/notifications/unread-count": {
       "get": {
         "tags": [
@@ -2866,6 +2893,17 @@
         "title": "HealthResponse",
         "description": "Health check payload."
       },
+      "NotificationKind": {
+        "type": "string",
+        "enum": [
+          "goal_deadline",
+          "goal_done",
+          "goal_stale",
+          "tasks_due_soon"
+        ],
+        "title": "NotificationKind",
+        "description": "Why a notification was created."
+      },
       "NotificationRead": {
         "properties": {
           "id": {
@@ -2873,7 +2911,18 @@
             "format": "uuid",
             "title": "Id"
           },
-          "task_id": {
+          "kind": {
+            "$ref": "#/components/schemas/NotificationKind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "goal_id": {
             "anyOf": [
               {
                 "type": "string",
@@ -2883,36 +2932,7 @@
                 "type": "null"
               }
             ],
-            "title": "Task Id"
-          },
-          "task_title": {
-            "type": "string",
-            "title": "Task Title"
-          },
-          "reason": {
-            "$ref": "#/components/schemas/PostponeReason"
-          },
-          "headline": {
-            "type": "string",
-            "title": "Headline"
-          },
-          "actions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Actions"
-          },
-          "reflection": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reflection"
+            "title": "Goal Id"
           },
           "created_at": {
             "type": "string",
@@ -2927,17 +2947,15 @@
         "type": "object",
         "required": [
           "id",
-          "task_id",
-          "task_title",
-          "reason",
-          "headline",
-          "actions",
-          "reflection",
+          "kind",
+          "title",
+          "body",
+          "goal_id",
           "created_at",
           "read"
         ],
         "title": "NotificationRead",
-        "description": "A saved tip about a postponed task."
+        "description": "Something worth a look: a goal update or tasks coming due."
       },
       "PlanItem": {
         "properties": {

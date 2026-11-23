@@ -125,11 +125,12 @@ describe('TasksScreen views', () => {
     expect(screen.getByText('Without goal')).toBeInTheDocument()
   })
 
-  it('shows the next step on each card', async () => {
+  it('shows the next step on each card, apart from the title', async () => {
     mockData([makeTask({ due_date: TODAY })])
     render(<TasksScreen />)
 
-    expect(await screen.findByText('Next: Find the policy')).toBeInTheDocument()
+    expect(await screen.findByText('Next step')).toBeInTheDocument()
+    expect(screen.getByText('Find the policy')).toHaveClass('next-text')
   })
 
   it('has no accessibility violations', async () => {

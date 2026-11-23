@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master import cleanup
 from task_master.cleanup import purge_completed_tasks, purge_read_notifications
-from task_master.models import Goal, Notification, PostponeReason, Task, TaskStatus
+from task_master.models import Goal, Notification, NotificationKind, Task, TaskStatus
 from tests.factories import make_goal, make_task, make_user
 
 NOW = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
@@ -83,10 +83,10 @@ class TestPurgeReadNotifications:
         user = await make_user(session)
         notification = Notification(
             user_id=user.id,
-            task_title="Tax",
-            reason=PostponeReason.STUCK,
-            headline="Make the first step smaller",
-            actions=["Split it"],
+            kind=NotificationKind.TASKS_DUE_SOON,
+            key=f"test:{created_at.isoformat()}:{read}",
+            title="2 tasks are due in the next 3 days",
+            body="Review them.",
             created_at=created_at,
             read_at=created_at if read else None,
         )

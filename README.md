@@ -20,7 +20,9 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 - **Routines** repeat daily, weekly on chosen days, or monthly on a day of
   the month, between a start and an end date. They are ticked off per day
   and show a streak, but are never postponed.
-- Tips from postponing are kept under the **notifications** bell.
+- After postponing, a **tip** pops up with the fix for that reason and a link
+  to its guide on the **Tips** page, which explains each reason with
+  before-and-after examples.
 - New users are asked for their name and timezone on first sign-in; the
   account, with everything in it, can be deleted from Settings.
 - **Today** shows the day's ranked **Top 3** tasks and, separately, its
@@ -89,9 +91,9 @@ npm run generate:api
 ## Branches
 
 `master` is the stable line. Work happens on a feature branch and reaches
-`master` through a pull request, which is where CI runs. Development so far
-is on `feature/auth-and-tooling`; from here on, the plan is one short-lived
-branch per page or feature (e.g. `feature/today-page`).
+`master` through a pull request, which is where CI runs. The first round of
+work was merged in PR #1; from here on there is one branch per page or
+feature (e.g. `feature/tasks-page`, `feature/today-page`).
 
 ## CI
 

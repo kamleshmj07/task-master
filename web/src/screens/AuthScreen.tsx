@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { useAuth } from '@/authContext'
+import { InfoTip } from '@/components/InfoTip'
 
 type Mode = 'login' | 'register'
 
@@ -50,7 +51,12 @@ export function AuthScreen() {
           />
         </label>
         {!isLogin && (
-          <p className="hint">At least 12 characters, not containing your email.</p>
+          <div className="row">
+            <span className="muted small">Password rules</span>
+            <InfoTip label="Password rules">
+              At least 12 characters, and it must not contain the name part of your email.
+            </InfoTip>
+          </div>
         )}
         {error && (
           <p role="alert" className="error">

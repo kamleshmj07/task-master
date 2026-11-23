@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { addDays, todayIso } from '@/dates'
-import { PostponeDialog, SuggestionCard } from '@/screens/PostponeForm'
+import { NavigationContext } from '@/navigation'
+import { PostponeDialog, TipDialog } from '@/screens/PostponeForm'
 import { findA11yViolations } from '@/test/axe'
 import { makeTask } from '@/test/fixtures'
 import { fail, mockApi, ok } from '@/test/mockApi'
@@ -152,7 +153,7 @@ describe('PostponeDialog dates', () => {
   })
 })
 
-describe('SuggestionCard', () => {
+describe('TipDialog', () => {
   function result(reason: 'stuck' | 'blocked'): PostponeResponse {
     return {
       task: makeTask({ title: 'Tax' }),
@@ -173,27 +174,67 @@ describe('SuggestionCard', () => {
     }
   }
 
-  it('says where the task went', () => {
-    render(<SuggestionCard result={result('blocked')} onDismiss={vi.fn()} />)
+  function renderTip(reason: 'stuck' | 'blocked', onOpenSteps?: () => void) {
+    const go = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <NavigationContext.Provider value={{ go }}>
+        <TipDialog result={result(reason)} onDismiss={onDismiss} {...(onOpenSteps ? { onOpenSteps } : {})} />
+      </NavigationContext.Provider>,
+    )
+    return { go, onDismiss }
+  }
 
-    expect(screen.getByText('Moved “Tax” to Someday. Saved to your notifications.')).toBeInTheDocument()
+  it('pops up as a dialog named after the fix', () => {
+    renderTip('blocked')
+
+    expect(screen.getByRole('dialog', { name: 'Clear the way' })).toBeInTheDocument()
+  })
+
+  it('says where the task went', () => {
+    renderTip('blocked')
+
+    expect(screen.getByText(/Moved “Tax” to Someday/)).toBeInTheDocument()
   })
 
   it('lists the fixes as a checklist', () => {
-    render(<SuggestionCard result={result('blocked')} onDismiss={vi.fn()} />)
+    renderTip('blocked')
 
     expect(screen.getAllByRole('checkbox')).toHaveLength(2)
   })
 
   it('shows the reflection prompt', () => {
-    render(<SuggestionCard result={result('blocked')} onDismiss={vi.fn()} />)
+    renderTip('blocked')
 
     expect(screen.getByRole('note')).toHaveTextContent('Is it really time, or is it dread?')
   })
 
+  it('no longer mentions notifications', () => {
+    renderTip('blocked')
+
+    expect(screen.queryByText(/notifications/i)).not.toBeInTheDocument()
+  })
+
+  it('disappears when acknowledged', async () => {
+    const { onDismiss } = renderTip('blocked')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Got it' }))
+
+    expect(onDismiss).toHaveBeenCalled()
+  })
+
+  it('links to the guide for the reason', async () => {
+    const { go, onDismiss } = renderTip('blocked')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Read the guide with examples' }))
+
+    expect(go).toHaveBeenCalledWith('tips', { tip: 'blocked' })
+    expect(onDismiss).toHaveBeenCalled()
+  })
+
   it('offers to open the steps when the fix starts there', async () => {
     const onOpenSteps = vi.fn()
-    render(<SuggestionCard result={result('stuck')} onDismiss={vi.fn()} onOpenSteps={onOpenSteps} />)
+    renderTip('stuck', onOpenSteps)
 
     await userEvent.click(screen.getByRole('button', { name: 'Open steps' }))
 
@@ -201,7 +242,7 @@ describe('SuggestionCard', () => {
   })
 
   it('does not offer steps for blockers', () => {
-    render(<SuggestionCard result={result('blocked')} onDismiss={vi.fn()} onOpenSteps={vi.fn()} />)
+    renderTip('blocked', vi.fn())
 
     expect(screen.queryByRole('button', { name: 'Open steps' })).not.toBeInTheDocument()
   })

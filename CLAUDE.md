@@ -2,13 +2,16 @@
 
 Goal-driven task manager to beat procrastination. Read this first when
 picking up development. Shared rules (uv only, anyio tests, commit message
-style, `ArthurClune` as PR reviewer, security and testing rules) live in
+style, security and testing rules) live in
 `C:\dev\CLAUDE.md` and `C:\dev\.claude\rules\`; this file adds what is
 specific to this repo.
 
 ## Working agreements with the user
 
 - Never start servers, commit, or push unless asked in that turn.
+- Never create a branch on your own: suggest one, say what it would be based
+  on, and wait for the OK. Branching from unmerged work mixes features into
+  one PR, so say so when that would happen.
 - Redesign the UI **page by page, flow by flow**. The Tasks page is done; the
   others (Today, Routines, Goals, Settings, then mobile) follow and should
   reuse its pieces (`Modal`, `TaskCard`, the step checklist, chips).
@@ -51,6 +54,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   `smoke-test@example.com`. Re-seed with
   `cd backend && uv run python -m tests.seed.seed_load_more`.
 - Clean-up job (not yet scheduled anywhere): `uv run python -m task_master.cleanup`.
+- Stopping the web dev server's `npm run dev` leaves Vite's `node` child
+  listening on 5173. After stopping it, check the port and end that
+  `vite.js` process by PID.
 
 ## Domain rules (decided with the user)
 
@@ -70,7 +76,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   `other` (which needs a note of up to 280 characters). It moves the date
   later or to Someday (`to_date: null`), counts towards `postpone_count`, and
   returns a suggested fix (`postponement.py`); the third `blocked` adds "is it
-  really time, or dread?". The fix is also saved as a **notification**.
+  really time, or dread?". The fix appears once as a **tip pop-up** that
+  links to its guide on the **Tips** page; it is not stored anywhere and is
+  gone once acknowledged.
   `PATCH /tasks/{id}` refuses to move a date later or clear it, so nothing
   skips postponement. Moving a date earlier is a plain edit and is not logged.
 - **Routines** repeat daily, weekly on chosen weekdays, or monthly on a day
@@ -79,8 +87,15 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   Top 3.
 - **Top 3**: ranked one-off tasks for a day (today or later), shown beside
   the day's routines (`/plans/{date}`).
-- **Notifications**: only postpone tips for now; bell with unread badge, mark
-  read or all read.
+- **Notifications** (`alerts.py`), created when the app opens
+  (`POST /notifications/check`, safe to repeat; each event has a unique
+  `key`):
+  - an active goal's deadline is within 7 days (once per deadline)
+  - every task under an active goal is done (once per latest completion)
+  - an active goal has not moved for 30 days: no edit, new task, task
+    change or step tick (once per quiet spell)
+  - one summary a day when open tasks are due in the next 3 days
+  Each opens Goals or Tasks from the bell. Tips are never stored.
 - **Account**: `display_name` is asked on first sign-in (welcome dialog,
   cannot be skipped). `DELETE /users/me` with the current password deletes
   everything the user owns.
@@ -106,6 +121,13 @@ artifact (artboard "Tasks page – Desk lamp direction").
   green every step done); the next step is the large amber line. Steps form a
   numbered trail (real sequence). One motion: the new next step glows once.
 - Copy rules: no middle-dot joins, no ALL-CAPS labels, no arrows glued to text.
+- Extra information about a field goes behind an ⓘ button (`InfoTip`), never
+  as grey text under it. Build fields with `Field` / `FieldGroup` so label
+  rows line up in grids.
+- Selected states (`aria-pressed`, `.selected`, `aria-current`) need their
+  own `:hover` rule: the generic `button:hover` outranks them otherwise.
+- Task rows: title with its facts, then the next step as its own block
+  ("Next step" label, amber text, amber left edge).
 - Done for the shell and Tasks page; Today, Routines and Goals inherit the
   tokens but still need their own layout pass.
 
@@ -128,16 +150,21 @@ artifact (artboard "Tasks page – Desk lamp direction").
 
 ## Status (2026-11-23)
 
-- Branch `feature/auth-and-tooling`, pushed to GitHub, 16 commits ahead of
-  `master` at `3681955`. **No pull request yet, so CI has never run.**
+- `master` has everything so far: PR #1 (`feature/auth-and-tooling`) merged
+  at `1b21d97` after the first CI run passed (backend, frontend,
+  api-contract).
+- Active branch: **`feature/tasks-page`**, for Tasks page work only. Other
+  pages get their own branches when needed. Each branch reaches `master`
+  through a PR.
+- PRs are opened without a reviewer for now: the reviewer rule in
+  `C:\dev\.claude\rules\backend.md` is temporarily switched off.
 - Dev database migrated to `c2e193cd6125` (head).
 - Tests: 383 backend (98% coverage), 99 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
-1. Open a PR into `master` (reviewer `ArthurClune`) so CI runs; then use one
-   short-lived branch per page or feature.
-2. User testing of the redesigned Tasks page, notifications and Settings.
+1. Continue the Tasks page on `feature/tasks-page`; open a PR when a batch is done.
+2. User testing of the redesigned Tasks page, Tips page and Settings.
 3. Redesign the remaining pages, mockup first: Today, Routines, Goals.
 4. Schedule the clean-up job daily.
 5. Move login throttling counters to Redis and configure uvicorn's trusted

@@ -1,3 +1,4 @@
+import { FieldGroup } from '@/components/Field'
 import { MAX_MINUTES, type TimeUnit } from '@/data'
 
 interface TimeLimitFieldProps {
@@ -11,9 +12,10 @@ interface TimeLimitFieldProps {
 export function TimeLimitField({ amount, unit, onAmountChange, onUnitChange }: TimeLimitFieldProps) {
   const hours = unit === 'hours'
   return (
-    <fieldset className="plain stack-sm">
-      <legend>Time limit</legend>
-      <p className="hint">Optional. The most time you want to spend on it in total.</p>
+    <FieldGroup
+      label="Time limit"
+      info="Optional. The most time you want to spend on this task in total, across all sittings. If you go past it, consider moving on and postponing the rest."
+    >
       <div className="row nowrap">
         <input
           className="grow"
@@ -32,6 +34,6 @@ export function TimeLimitField({ amount, unit, onAmountChange, onUnitChange }: T
           <option value="hours">hours</option>
         </select>
       </div>
-    </fieldset>
+    </FieldGroup>
   )
 }
