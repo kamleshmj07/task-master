@@ -4,7 +4,8 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 
 ## What it does
 
-- **Goals** are outcomes worth working toward, each with a "why". Every
+- **Goals** are outcomes worth working toward, each with a "why" and its
+  progress: tasks done, days to the deadline, the next task due. Every
   account starts with an **Essentials** goal for everyday responsibilities;
   tasks can also have no goal.
 - **Tasks** are broken into ordered **steps**. The first unfinished step is
