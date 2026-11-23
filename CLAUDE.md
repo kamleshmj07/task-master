@@ -73,7 +73,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   `other` (which needs a note of up to 280 characters). It moves the date
   later or to Someday (`to_date: null`), counts towards `postpone_count`, and
   returns a suggested fix (`postponement.py`); the third `blocked` adds "is it
-  really time, or dread?". The fix is also saved as a **notification**.
+  really time, or dread?". The fix appears once as a **tip pop-up** that
+  links to its guide on the **Tips** page; it is not stored anywhere and is
+  gone once acknowledged.
   `PATCH /tasks/{id}` refuses to move a date later or clear it, so nothing
   skips postponement. Moving a date earlier is a plain edit and is not logged.
 - **Routines** repeat daily, weekly on chosen weekdays, or monthly on a day
@@ -82,7 +84,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   Top 3.
 - **Top 3**: ranked one-off tasks for a day (today or later), shown beside
   the day's routines (`/plans/{date}`).
-- **Notifications**: only postpone tips for now; bell with unread badge, mark
+- **Notifications**: the bell, its unread badge and the API exist, but
+  nothing creates notifications yet (tips no longer do). Decide which events
+  should before adding producers; the model is still shaped like a tip. Mark
   read or all read.
 - **Account**: `display_name` is asked on first sign-in (welcome dialog,
   cannot be skipped). `DELETE /users/me` with the current password deletes
@@ -109,6 +113,13 @@ artifact (artboard "Tasks page – Desk lamp direction").
   green every step done); the next step is the large amber line. Steps form a
   numbered trail (real sequence). One motion: the new next step glows once.
 - Copy rules: no middle-dot joins, no ALL-CAPS labels, no arrows glued to text.
+- Extra information about a field goes behind an ⓘ button (`InfoTip`), never
+  as grey text under it. Build fields with `Field` / `FieldGroup` so label
+  rows line up in grids.
+- Selected states (`aria-pressed`, `.selected`, `aria-current`) need their
+  own `:hover` rule: the generic `button:hover` outranks them otherwise.
+- Task rows: title with its facts, then the next step as its own block
+  ("Next step" label, amber text, amber left edge).
 - Done for the shell and Tasks page; Today, Routines and Goals inherit the
   tokens but still need their own layout pass.
 
@@ -145,7 +156,7 @@ artifact (artboard "Tasks page – Desk lamp direction").
 ## Next steps (ask the user which first)
 
 1. Continue the Tasks page on `feature/tasks-page`; open a PR when a batch is done.
-2. User testing of the redesigned Tasks page, notifications and Settings.
+2. User testing of the redesigned Tasks page, Tips page and Settings.
 3. Redesign the remaining pages, mockup first: Today, Routines, Goals.
 4. Schedule the clean-up job daily.
 5. Move login throttling counters to Redis and configure uvicorn's trusted
