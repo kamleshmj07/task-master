@@ -52,6 +52,7 @@ function Shell() {
   if (!user) return <AuthScreen />
 
   return (
+    <NavigationContext.Provider value={navigation}>
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-inner">
@@ -83,11 +84,10 @@ function Shell() {
           />
         </div>
       </header>
-      <NavigationContext.Provider value={navigation}>
-        <main className="app">{SCREENS[screen].render(route)}</main>
-      </NavigationContext.Provider>
+      <main className="app">{SCREENS[screen].render(route)}</main>
       {!user.display_name && <WelcomeDialog />}
     </div>
+    </NavigationContext.Provider>
   )
 }
 

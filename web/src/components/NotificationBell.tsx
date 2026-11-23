@@ -2,10 +2,23 @@ import type { NotificationRead } from '@task-master/api-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/api'
+import { type ScreenName, useNavigation } from '@/navigation'
 import { onNotificationsChanged, timeAgo } from '@/notifications'
 
-/** Top-bar bell: unread badge, and a panel of saved tips to mark as read. */
+/** Where each kind of notification sends you, and what the button says. */
+const DESTINATIONS: Record<NotificationRead['kind'], { screen: ScreenName; action: string }> = {
+  goal_deadline: { screen: 'goals', action: 'Open goals' },
+  goal_done: { screen: 'goals', action: 'Open goals' },
+  goal_stale: { screen: 'goals', action: 'Open goals' },
+  tasks_due_soon: { screen: 'tasks', action: 'Review tasks' },
+}
+
+/**
+ * Top-bar bell. When the app opens it asks the server to create any
+ * notifications now due (goal updates, tasks coming due), then shows them.
+ */
 export function NotificationBell() {
+  const { go } = useNavigation()
   const [open, setOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const [items, setItems] = useState<NotificationRead[] | null>(null)
@@ -22,7 +35,10 @@ export function NotificationBell() {
   }, [])
 
   useEffect(() => {
-    void loadCount()
+    void (async () => {
+      const { data } = await api.POST('/notifications/check')
+      setUnread(data?.unread ?? 0)
+    })()
     return onNotificationsChanged(() => void loadCount())
   }, [loadCount])
 
@@ -36,11 +52,22 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open, loadItems])
 
-  async function handleMarkRead(id: string) {
+  async function markRead(id: string) {
     await api.POST('/notifications/{notification_id}/read', {
       params: { path: { notification_id: id } },
     })
+  }
+
+  async function handleMarkRead(id: string) {
+    await markRead(id)
     await Promise.all([loadItems(), loadCount()])
+  }
+
+  async function handleOpen(item: NotificationRead) {
+    if (!item.read) await markRead(item.id)
+    setOpen(false)
+    void loadCount()
+    go(DESTINATIONS[item.kind].screen)
   }
 
   async function handleMarkAllRead() {
@@ -85,33 +112,35 @@ export function NotificationBell() {
               </button>
             )}
           </div>
-          {items?.length === 0 && <p className="muted panel-empty">Nothing yet. Tips you get when postponing are kept here.</p>}
+          {items?.length === 0 && (
+            <p className="muted panel-empty">
+              You're all caught up. Goal updates and tasks coming due will show up here.
+            </p>
+          )}
           <ul className="list panel-list">
             {items?.map((item) => (
               <li key={item.id} className={item.read ? 'note' : 'note unread'}>
                 {!item.read && <span className="unread-dot" aria-hidden="true" />}
                 <div className="grow stack-xs">
-                  <p className="small muted">
-                    Tip for “{item.task_title}”, {timeAgo(item.created_at)}
-                  </p>
-                  <p className="title">{item.headline}</p>
-                  <ul className="note-actions">
-                    {item.actions.map((action) => (
-                      <li key={action}>{action}</li>
-                    ))}
-                  </ul>
-                  {item.reflection && <p className="reflection small">{item.reflection}</p>}
+                  <p className="title">{item.title}</p>
+                  <p className="small muted">{item.body}</p>
+                  <p className="small muted">{timeAgo(item.created_at)}</p>
+                  <div className="row note-buttons">
+                    <button type="button" className="small-button" onClick={() => void handleOpen(item)}>
+                      {DESTINATIONS[item.kind].action}
+                    </button>
+                    {!item.read && (
+                      <button
+                        type="button"
+                        className="ghost small-button"
+                        aria-label={`Mark “${item.title}” as read`}
+                        onClick={() => void handleMarkRead(item.id)}
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {!item.read && (
-                  <button
-                    type="button"
-                    className="ghost"
-                    aria-label={`Mark “${item.headline}” as read`}
-                    onClick={() => void handleMarkRead(item.id)}
-                  >
-                    Mark read
-                  </button>
-                )}
               </li>
             ))}
           </ul>

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { NotificationBell } from '@/components/NotificationBell'
+import { NavigationContext } from '@/navigation'
 import { announceNotificationsChanged, timeAgo } from '@/notifications'
 import { findA11yViolations } from '@/test/axe'
 import { mockApi, ok } from '@/test/mockApi'
@@ -13,78 +14,122 @@ vi.mock('@/api', async (importOriginal) => ({
   api: (await import('@/test/mockApi')).mockApi,
 }))
 
-function tip(overrides: Partial<NotificationRead> = {}): NotificationRead {
+function notification(overrides: Partial<NotificationRead> = {}): NotificationRead {
   return {
     id: 'n1',
-    task_id: 't1',
-    task_title: 'Tax',
-    reason: 'stuck',
-    headline: 'Make the first step smaller',
-    actions: ['Split this task'],
-    reflection: null,
+    kind: 'goal_deadline',
+    title: '“Ship” is due in 3 days',
+    body: 'The deadline is Wed 25 Nov. Check what is left to do.',
+    goal_id: 'g1',
     created_at: new Date().toISOString(),
     read: false,
     ...overrides,
   }
 }
 
-function mockNotifications(items: NotificationRead[]) {
+/** The server: `check` reports the unread count, lists return `items`. */
+function mockServer(items: NotificationRead[]) {
+  const unread = () => ({ unread: items.filter((item) => !item.read).length })
+  mockApi.POST.mockImplementation((path: string) => ok(path === '/notifications/check' ? unread() : {}))
   mockApi.GET.mockImplementation((path: string) =>
-    path === '/notifications/unread-count'
-      ? ok({ unread: items.filter((item) => !item.read).length })
-      : ok(items),
+    ok(path === '/notifications/unread-count' ? unread() : items),
   )
 }
 
+function renderBell() {
+  const go = vi.fn()
+  const view = render(
+    <NavigationContext.Provider value={{ go }}>
+      <NotificationBell />
+    </NavigationContext.Provider>,
+  )
+  return { go, ...view }
+}
+
+const openBell = async () => userEvent.click(await screen.findByRole('button', { name: /Notifications/ }))
+
 beforeEach(() => {
   for (const verb of Object.values(mockApi)) verb.mockReset()
-  mockApi.POST.mockReturnValue(ok({}))
 })
 
 describe('NotificationBell', () => {
-  it('shows the unread count in its label', async () => {
-    mockNotifications([tip(), tip({ id: 'n2' })])
-    render(<NotificationBell />)
+  it('checks for new notifications when the app opens', async () => {
+    mockServer([notification()])
+    renderBell()
 
-    expect(await screen.findByRole('button', { name: 'Notifications, 2 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument()
+    expect(mockApi.POST).toHaveBeenCalledWith('/notifications/check')
   })
 
-  it('lists saved tips when opened', async () => {
-    mockNotifications([tip()])
-    render(<NotificationBell />)
+  it('lists title and explanation when opened', async () => {
+    mockServer([notification()])
+    renderBell()
 
-    await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }))
+    await openBell()
 
-    expect(await screen.findByText('Make the first step smaller')).toBeInTheDocument()
+    expect(await screen.findByText('“Ship” is due in 3 days')).toBeInTheDocument()
+    expect(screen.getByText(/Check what is left to do/)).toBeInTheDocument()
   })
 
-  it('marks one tip as read', async () => {
-    mockNotifications([tip()])
-    render(<NotificationBell />)
-    await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }))
+  it('takes a goal notification to Goals and marks it read', async () => {
+    mockServer([notification()])
+    const { go } = renderBell()
+    await openBell()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Mark “Make the first step smaller” as read' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Open goals' }))
 
     expect(mockApi.POST).toHaveBeenCalledWith('/notifications/{notification_id}/read', {
       params: { path: { notification_id: 'n1' } },
     })
+    expect(go).toHaveBeenCalledWith('goals')
+  })
+
+  it('takes the due-soon summary to Tasks', async () => {
+    mockServer([notification({ kind: 'tasks_due_soon', title: '3 tasks are due in the next 3 days', goal_id: null })])
+    const { go } = renderBell()
+    await openBell()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Review tasks' }))
+
+    expect(go).toHaveBeenCalledWith('tasks')
+  })
+
+  it('marks one as read without leaving', async () => {
+    mockServer([notification()])
+    const { go } = renderBell()
+    await openBell()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark ““Ship” is due in 3 days” as read' }))
+
+    expect(mockApi.POST).toHaveBeenCalledWith('/notifications/{notification_id}/read', {
+      params: { path: { notification_id: 'n1' } },
+    })
+    expect(go).not.toHaveBeenCalled()
   })
 
   it('marks all as read', async () => {
-    mockNotifications([tip()])
-    render(<NotificationBell />)
-    await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }))
+    mockServer([notification()])
+    renderBell()
+    await openBell()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Mark all as read' }))
 
     expect(mockApi.POST).toHaveBeenCalledWith('/notifications/read-all')
   })
 
+  it('says you are caught up when there is nothing', async () => {
+    mockServer([])
+    renderBell()
+    await openBell()
+
+    expect(await screen.findByText(/You're all caught up/)).toBeInTheDocument()
+  })
+
   it('refreshes the count when told notifications changed', async () => {
-    mockNotifications([])
-    render(<NotificationBell />)
+    mockServer([])
+    renderBell()
     await screen.findByRole('button', { name: 'Notifications' })
-    mockNotifications([tip()])
+    mockServer([notification()])
 
     announceNotificationsChanged()
 
@@ -92,10 +137,10 @@ describe('NotificationBell', () => {
   })
 
   it('has no accessibility violations when open', async () => {
-    mockNotifications([tip({ reflection: 'Is it dread?' })])
-    const { container } = render(<NotificationBell />)
-    await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }))
-    await screen.findByText('Make the first step smaller')
+    mockServer([notification(), notification({ id: 'n2', read: true })])
+    const { container } = renderBell()
+    await openBell()
+    await screen.findAllByText('“Ship” is due in 3 days')
 
     expect(await findA11yViolations(container)).toEqual([])
   })
