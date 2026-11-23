@@ -1,10 +1,12 @@
-import type { TaskRead } from '@task-master/api-client'
-import { type FormEvent, useState } from 'react'
+import type { PostponementRead, PostponeReason, TaskRead } from '@task-master/api-client'
+import { type FormEvent, useEffect, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { InfoTip } from '@/components/InfoTip'
-import { timeLimitLabel } from '@/data'
-import { daysBetween, dueLabel } from '@/dates'
+import { postponementSummary, REASONS, timeLimitLabel } from '@/data'
+import { daysBetween, dueLabel, formatDay } from '@/dates'
+import { tipArticle } from '@/tips'
+import { useNavigation } from '@/navigation'
 
 interface TaskCardProps {
   task: TaskRead
@@ -15,6 +17,7 @@ interface TaskCardProps {
   /** The task changed on the server; `allStepsDone` asks to confirm completion. */
   onChanged: (task: TaskRead, allStepsDone: boolean) => void
   onPostpone: () => void
+  onEdit: () => void
 }
 
 /** One task row: status rail, title, its next step, facts; expands to its steps. */
@@ -26,6 +29,7 @@ export function TaskCard({
   onToggleOpen,
   onChanged,
   onPostpone,
+  onEdit,
 }: TaskCardProps) {
   const done = task.status === 'done'
   const finished = task.steps.filter((step) => step.done).length
@@ -67,7 +71,7 @@ export function TaskCard({
             {goalTitle && <span>{goalTitle}</span>}
             {task.postpone_count > 0 && (
               <span className="loss strong">
-                Postponed {task.postpone_count} {task.postpone_count === 1 ? 'time' : 'times'}
+                {postponementSummary(task.postpone_count, task.postponement_reasons)}
               </span>
             )}
           </div>
@@ -88,6 +92,12 @@ export function TaskCard({
               Postpone
             </button>
           )}
+          <button type="button" className="ghost icon" aria-label={`Edit “${task.title}”`} onClick={onEdit}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
           <button
             type="button"
             className="ghost icon"
@@ -102,6 +112,7 @@ export function TaskCard({
         </div>
       </div>
       {open && <StepList task={task} onChanged={onChanged} />}
+      {open && task.postpone_count > 0 && <PostponementHistory task={task} />}
     </article>
   )
 }
@@ -287,4 +298,59 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
 
 function stepClass(glow: boolean, dropTarget: boolean): string {
   return ['step', glow && 'glow', dropTarget && 'drop-target'].filter(Boolean).join(' ')
+}
+
+const REASON_LABELS = Object.fromEntries(REASONS.map(({ value, label }) => [value, label])) as Record<
+  PostponeReason,
+  string
+>
+
+/** Every postponement of a task, newest first, with a guide for a repeated reason. */
+function PostponementHistory({ task }: { task: TaskRead }) {
+  const { go } = useNavigation()
+  const [entries, setEntries] = useState<PostponementRead[] | null>(null)
+
+  useEffect(() => {
+    let current = true
+    void (async () => {
+      const { data } = await api.GET('/tasks/{task_id}/postponements', {
+        params: { path: { task_id: task.id }, query: { limit: 100 } },
+      })
+      if (current) setEntries([...(data ?? [])].reverse())
+    })()
+    return () => {
+      current = false
+    }
+  }, [task.id, task.postpone_count])
+
+  const repeated = (Object.entries(task.postponement_reasons) as [PostponeReason, number][])
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])[0]
+  const guide = repeated ? tipArticle(repeated[0]) : undefined
+
+  return (
+    <div className="history">
+      <h3 className="steps-title">History</h3>
+      {guide && repeated && (
+        <p className="small">
+          {REASON_LABELS[repeated[0]]}, {repeated[1]} times.{' '}
+          <button type="button" className="link" onClick={() => go('tips', { tip: repeated[0] })}>
+            Read: {guide.title}
+          </button>
+        </p>
+      )}
+      <ol className="history-list">
+        {entries?.map((entry) => (
+          <li key={entry.id} className="history-entry">
+            <span className="history-date">{formatDay(entry.created_at.slice(0, 10))}</span>
+            <span>
+              Moved to {entry.to_date ? formatDay(entry.to_date) : 'Someday'}
+              <span className="muted">. {REASON_LABELS[entry.reason]}</span>
+              {entry.note && <span className="muted">: “{entry.note}”</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
 }

@@ -6,7 +6,7 @@ import type {
 } from '@task-master/api-client'
 
 import { api } from '@/api'
-import { daysBetween, WEEKDAYS } from '@/dates'
+import { daysBetween, formatDay, WEEKDAYS } from '@/dates'
 
 export interface ReasonOption {
   value: PostponeReason
@@ -116,4 +116,68 @@ export function toMinutes(amount: string, unit: TimeUnit): number | null {
   const value = Number(amount)
   if (!amount.trim() || !Number.isFinite(value) || value <= 0) return null
   return Math.round(unit === 'hours' ? value * 60 : value)
+}
+
+/** "1 task", "3 tasks". */
+export function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/** Days after which an untouched active goal counts as quiet (matches notifications). */
+export const QUIET_GOAL_DAYS = 30
+/** Deadlines this close are flagged (matches notifications). */
+export const URGENT_DEADLINE_DAYS = 7
+
+export interface GoalHealth {
+  deadline: string | null
+  deadlineUrgent: boolean
+  quiet: string | null
+}
+
+/** Plain-language deadline and movement facts for a goal card. */
+export function goalHealth(goal: GoalRead, today: string): GoalHealth {
+  let deadline: string | null = null
+  let deadlineUrgent = false
+  if (goal.deadline) {
+    const left = daysBetween(today, goal.deadline)
+    const day = formatDay(goal.deadline)
+    deadline =
+      left < 0
+        ? `Deadline passed on ${day}`
+        : left === 0
+          ? 'Deadline is today'
+          : `Deadline ${day}, ${plural(left, 'day')} left`
+    deadlineUrgent = goal.status === 'active' && left <= URGENT_DEADLINE_DAYS
+  }
+  const quietDays = daysBetween(goal.progress.last_moved_at.slice(0, 10), today)
+  const quiet = goal.status === 'active' && quietDays >= QUIET_GOAL_DAYS ? `Quiet for ${quietDays} days` : null
+  return { deadline, deadlineUrgent, quiet }
+}
+
+/** Short reason names for summaries, e.g. "2 blocked". */
+export const REASON_NAMES: Record<PostponeReason, string> = {
+  stuck: 'stuck',
+  dreading: 'dreading',
+  blocked: 'blocked',
+  other: 'other',
+}
+
+/** "Postponed 3 times: 2 blocked, 1 dreading"; empty when never postponed. */
+export function postponementSummary(count: number, reasons: Partial<Record<PostponeReason, number>>): string {
+  if (count === 0) return ''
+  const parts = REASONS.map(({ value }) => [value, reasons[value] ?? 0] as const)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([value, n]) => `${n} ${REASON_NAMES[value]}`)
+  const head = `Postponed ${plural(count, 'time')}`
+  return parts.length ? `${head}: ${parts.join(', ')}` : head
+}
+
+/** Split stored minutes back into an amount and a unit for editing. */
+export function fromMinutes(minutes: number | null): { amount: string; unit: TimeUnit } {
+  if (!minutes) return { amount: '', unit: 'min' }
+  // Whole quarter-hours from an hour up read better as hours: 90 → 1.5 hours.
+  return minutes >= 60 && minutes % 15 === 0
+    ? { amount: String(minutes / 60), unit: 'hours' }
+    : { amount: String(minutes), unit: 'min' }
 }

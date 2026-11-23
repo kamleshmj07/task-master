@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { todayIso } from '@/dates'
 import { TasksScreen } from '@/screens/TasksScreen'
 import { findA11yViolations } from '@/test/axe'
-import { makeTask } from '@/test/fixtures'
+import { makeGoal, makeTask } from '@/test/fixtures'
 import { mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -14,16 +14,11 @@ vi.mock('@/api', async (importOriginal) => ({
   api: (await import('@/test/mockApi')).mockApi,
 }))
 
-const GOALS: GoalRead[] = [
-  {
-    id: 'g1',
-    title: 'Essentials',
-    why: null,
-    deadline: null,
-    status: 'active',
-    created_at: '',
-    updated_at: '',
-  },
+const GOALS: GoalRead[] = [makeGoal()]
+
+const HISTORY = [
+  { id: 'p1', task_id: 't1', from_date: '2099-01-01', to_date: '2099-01-05', reason: 'blocked', note: 'Waiting on Sam', created_at: '2026-11-10T10:00:00Z' },
+  { id: 'p2', task_id: 't1', from_date: '2099-01-05', to_date: null, reason: 'blocked', note: null, created_at: '2026-11-20T10:00:00Z' },
 ]
 
 const TODAY = todayIso()
@@ -50,6 +45,7 @@ function viewOf(task: TaskRead): View {
 function mockData(tasks: TaskRead[]) {
   mockApi.GET.mockImplementation((path: string, options?: { params?: { query?: Query } }) => {
     if (path === '/goals') return ok(GOALS)
+    if (path === '/tasks/{task_id}/postponements') return ok(HISTORY)
     const query = options?.params?.query ?? {}
     const byGoal = tasks.filter((task) =>
       query.no_goal ? task.goal_id === null : !query.goal_id || task.goal_id === query.goal_id,
@@ -291,6 +287,47 @@ describe('Step order', () => {
       params: { path: { task_id: 't1' } },
       body: { step_ids: ['s2', 's1'] },
     })
+  })
+})
+
+describe('Editing and history', () => {
+  const postponed = makeTask({ due_date: TODAY, postpone_count: 3, postponement_reasons: { blocked: 2, dreading: 1 } })
+
+  it('says why a task was postponed', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    expect(await screen.findByText('Postponed 3 times: 2 blocked, 1 dreading')).toBeInTheDocument()
+  })
+
+  it('shows the history, newest first, when the task is expanded', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    const entries = await screen.findAllByRole('listitem', { name: '' })
+    const history = entries.filter((item) => item.classList.contains('history-entry'))
+    expect(history[0]).toHaveTextContent('Moved to Someday')
+    expect(history[1]).toHaveTextContent('“Waiting on Sam”')
+  })
+
+  it('links to the guide for a reason that keeps coming back', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    expect(await screen.findByRole('button', { name: "Read: When something's in the way" })).toBeInTheDocument()
+  })
+
+  it('opens the edit dialog', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit “Renew insurance”' }))
+
+    expect(screen.getByRole('dialog', { name: 'Edit task' })).toBeInTheDocument()
   })
 })
 

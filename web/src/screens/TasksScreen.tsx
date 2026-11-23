@@ -5,6 +5,7 @@ import { api } from '@/api'
 import { Modal } from '@/components/Modal'
 import { groupReview, groupScheduled, loadGoals, type TaskGroup } from '@/data'
 import { todayIso } from '@/dates'
+import { EditTaskDialog } from '@/screens/EditTaskDialog'
 import { NewTaskPanel } from '@/screens/NewTaskPanel'
 import { PostponeDialog, TipDialog } from '@/screens/PostponeForm'
 import { TaskCard } from '@/screens/TaskCard'
@@ -43,6 +44,7 @@ export function TasksScreen() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [postponing, setPostponing] = useState<TaskRead | null>(null)
   const [confirming, setConfirming] = useState<TaskRead | null>(null)
+  const [editingTask, setEditingTask] = useState<TaskRead | null>(null)
   const [suggestion, setSuggestion] = useState<PostponeResponse | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -185,6 +187,7 @@ export function TasksScreen() {
                 setSuggestion(null)
                 setPostponing(task)
               }}
+              onEdit={() => setEditingTask(task)}
             />
           ))}
           </div>
@@ -204,6 +207,24 @@ export function TasksScreen() {
           onPostponed={(result) => {
             setPostponing(null)
             setSuggestion(result)
+            void tasks.reload()
+          }}
+        />
+      )}
+
+      {editingTask && (
+        <EditTaskDialog
+          task={editingTask}
+          goals={goals.data ?? []}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => {
+            setNotice(`Saved changes to “${editingTask.title}”.`)
+            setEditingTask(null)
+            void tasks.reload()
+          }}
+          onDeleted={() => {
+            setNotice(`Deleted “${editingTask.title}”.`)
+            setEditingTask(null)
             void tasks.reload()
           }}
         />
