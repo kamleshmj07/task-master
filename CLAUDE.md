@@ -150,25 +150,29 @@ artifact (artboard "Tasks page – Desk lamp direction").
 
 ## Status (2026-11-23)
 
-- `master` has everything so far: PR #1 (`feature/auth-and-tooling`) merged
-  at `1b21d97` after the first CI run passed (backend, frontend,
-  api-contract).
-- Active branch: **`feature/tasks-page`**, for Tasks page work only. Other
-  pages get their own branches when needed. Each branch reaches `master`
-  through a PR.
+- `master` has everything so far: PR #1 (MVP) at `1b21d97` and PR #2 (Tasks
+  page polish, Tips page, notifications) at `bcce44a`, both merged after CI
+  passed. The old feature branches are deleted.
+- **No active feature branch.** Before new work, suggest a branch off
+  `master` (e.g. `feature/today-page`) and wait for the user's OK. Each
+  branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
-  `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `c2e193cd6125` (head).
-- Tests: 383 backend (98% coverage), 99 web, 3 api-client, all passing.
+  `C:\dev\.claudeulesackend.md` is temporarily switched off.
+- Dev database migrated to `30bcd4c2b5e5` (head).
+- Tests: 404 backend (98% coverage), 116 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
-1. Continue the Tasks page on `feature/tasks-page`; open a PR when a batch is done.
-2. User testing of the redesigned Tasks page, Tips page and Settings.
-3. Redesign the remaining pages, mockup first: Today, Routines, Goals.
-4. Schedule the clean-up job daily.
-5. Move login throttling counters to Redis and configure uvicorn's trusted
-   proxy before running several workers.
-6. Mobile UI (shares `packages/api-client`; own screens).
-7. Later: email provider for password reset and verification; more
-   notification kinds if wanted.
+1. Editing gaps: tasks cannot be edited (title, goal, time limit, due date)
+   or deleted from the web app; goals can only change status; routines
+   cannot be edited. The API already supports all of it.
+2. Redesign Today, mockup first (still has old layout and copy).
+3. Redesign Goals (progress per goal) and Routines (streaks, week view).
+4. Show a task's postponement history (the API records it).
+5. Deployment: app container, production config, HTTPS; schedule the
+   clean-up job; Redis for login throttling and uvicorn's trusted proxy.
+6. Email provider for password reset and verification.
+7. End-to-end browser tests (Playwright).
+8. Mobile UI (shares `packages/api-client`; own screens).
+9. Decide whether the default Essentials goal should be left out of the
+   "hasn't moved in 30 days" notification.
