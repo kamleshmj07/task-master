@@ -96,6 +96,18 @@ describe('EditTaskDialog', () => {
     expect(mockApi.DELETE).not.toHaveBeenCalled()
   })
 
+  it('can create a new goal on the spot', async () => {
+    mockApi.POST.mockReturnValue(ok(makeGoal({ id: 'g9', title: 'Car' })))
+    renderDialog()
+
+    await userEvent.selectOptions(screen.getByLabelText('Goal'), '+ New goal…')
+    await userEvent.type(screen.getByRole('textbox', { name: 'New goal name' }), 'Car')
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    expect(mockApi.POST).toHaveBeenCalledWith('/goals', { body: { title: 'Car' } })
+    expect(await screen.findByLabelText('Goal')).toHaveValue('g9')
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderDialog()
 

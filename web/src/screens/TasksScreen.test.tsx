@@ -300,14 +300,28 @@ describe('Editing and history', () => {
     expect(await screen.findByText('Postponed 3 times: 2 blocked, 1 dreading')).toBeInTheDocument()
   })
 
-  it('shows the history, newest first, when the task is expanded', async () => {
+  it('keeps the history hidden until asked for', async () => {
     mockData([postponed])
     render(<TasksScreen />)
 
     await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
 
-    const entries = await screen.findAllByRole('listitem', { name: '' })
-    const history = entries.filter((item) => item.classList.contains('history-entry'))
+    expect(screen.getByRole('button', { name: 'Show postponement history' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.queryByRole('heading', { name: 'History' })).not.toBeInTheDocument()
+  })
+
+  it('shows the history, newest first, when asked', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show postponement history' }))
+
+    await screen.findByRole('heading', { name: 'History' })
+    const history = Array.from(document.querySelectorAll('.history-entry'))
     expect(history[0]).toHaveTextContent('Moved to Someday')
     expect(history[1]).toHaveTextContent('“Waiting on Sam”')
   })
@@ -317,6 +331,7 @@ describe('Editing and history', () => {
     render(<TasksScreen />)
 
     await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Show postponement history' }))
 
     expect(await screen.findByRole('button', { name: "Read: When something's in the way" })).toBeInTheDocument()
   })
@@ -328,6 +343,22 @@ describe('Editing and history', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Edit “Renew insurance”' }))
 
     expect(screen.getByRole('dialog', { name: 'Edit task' })).toBeInTheDocument()
+  })
+})
+
+describe('Finished tasks', () => {
+  const finished = makeTask({ status: 'done', steps: [{ id: 's1', text: 'Only', done: true }] })
+
+  it('offer no way to add, remove or reorder steps', async () => {
+    mockData([finished])
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Done/ }))
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    expect(screen.queryByRole('textbox', { name: /Add a step/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Remove step/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Only' })).toBeDisabled()
   })
 })
 

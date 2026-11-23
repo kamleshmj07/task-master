@@ -12,7 +12,7 @@ vi.mock('@/api', async (importOriginal) => ({
   api: (await import('@/test/mockApi')).mockApi,
 }))
 
-const WORKOUT = makeRoutine({ frequency: 'weekly', weekdays: [0, 2] })
+const WORKOUT = makeRoutine({ frequency: 'weekly', weekdays: [0, 2], time_limit_minutes: 30 })
 
 beforeEach(() => {
   for (const verb of Object.values(mockApi)) verb.mockReset()
@@ -51,6 +51,20 @@ describe('RoutinesScreen', () => {
       params: { path: { routine_id: 'r1' } },
       body: expect.objectContaining({ title: 'Workout', frequency: 'weekly', weekdays: [0, 2, 4] }),
     })
+  })
+
+  it('shows and edits the time limit', async () => {
+    render(<RoutinesScreen />)
+    expect(await screen.findByText(/30 min each time/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit “Workout”' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit routine' })
+    const amount = within(dialog).getByRole('spinbutton', { name: 'Time limit amount' })
+    await userEvent.clear(amount)
+    await userEvent.type(amount, '45')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApi.PATCH.mock.calls[0]?.[1].body.time_limit_minutes).toBe(45)
   })
 
   it('asks before deleting', async () => {

@@ -3,11 +3,10 @@ import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { Field, FieldGroup } from '@/components/Field'
+import { GoalPicker } from '@/components/GoalPicker'
 import { CloseIcon } from '@/components/Modal'
 import { TimeLimitField } from '@/components/TimeLimitField'
 import { type TimeUnit, toMinutes } from '@/data'
-
-const NEW_GOAL = '__new'
 
 interface NewTaskPanelProps {
   goals: GoalRead[]
@@ -21,25 +20,10 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
   const [title, setTitle] = useState('')
   const [steps, setSteps] = useState([''])
   const [goalId, setGoalId] = useState('')
-  const [newGoal, setNewGoal] = useState('')
   const [limitAmount, setLimitAmount] = useState('')
   const [limitUnit, setLimitUnit] = useState<TimeUnit>('min')
   const [dueDate, setDueDate] = useState('')
   const [error, setError] = useState<string | null>(null)
-
-  const creatingGoal = goalId === NEW_GOAL
-
-  async function handleCreateGoal() {
-    const { data, error: apiError } = await api.POST('/goals', { body: { title: newGoal } })
-    if (apiError || !data) {
-      setError(errorMessage(apiError))
-      return
-    }
-    setNewGoal('')
-    setGoalId(data.id)
-    setError(null)
-    onGoalCreated()
-  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -47,7 +31,7 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
       body: {
         title,
         steps: steps.map((step) => step.trim()).filter(Boolean),
-        goal_id: goalId && !creatingGoal ? goalId : null,
+        goal_id: goalId || null,
         time_limit_minutes: toMinutes(limitAmount, limitUnit),
         due_date: dueDate || null,
       },
@@ -119,36 +103,13 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
       </FieldGroup>
 
       <div className="grid">
-        <div className="stack-sm">
-          <Field label="Goal" info="The outcome this task moves you toward. Optional: everyday chores can stay goal-less or go under Essentials.">
-            {(id) => (
-              <select id={id} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
-                <option value="">No goal</option>
-                {goals.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {goal.title}
-                  </option>
-                ))}
-                <option value={NEW_GOAL}>+ New goal…</option>
-              </select>
-            )}
-          </Field>
-          {creatingGoal && (
-            <div className="row nowrap">
-              <input
-                className="grow"
-                aria-label="New goal name"
-                placeholder="New goal name"
-                maxLength={200}
-                value={newGoal}
-                onChange={(e) => setNewGoal(e.target.value)}
-              />
-              <button type="button" disabled={!newGoal.trim()} onClick={() => void handleCreateGoal()}>
-                Create
-              </button>
-            </div>
-          )}
-        </div>
+        <GoalPicker
+          goals={goals}
+          value={goalId}
+          onChange={setGoalId}
+          onGoalCreated={() => onGoalCreated()}
+          info="The outcome this task moves you toward. Optional: everyday chores can stay goal-less or go under Essentials."
+        />
         <TimeLimitField
           amount={limitAmount}
           unit={limitUnit}

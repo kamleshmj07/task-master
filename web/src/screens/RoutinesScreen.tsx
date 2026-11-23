@@ -3,8 +3,10 @@ import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { Field, FieldGroup } from '@/components/Field'
+import { GoalPicker } from '@/components/GoalPicker'
 import { Modal } from '@/components/Modal'
-import { describeSchedule, loadGoals } from '@/data'
+import { TimeLimitField } from '@/components/TimeLimitField'
+import { describeSchedule, fromMinutes, loadGoals, timeLimitLabel, type TimeUnit, toMinutes } from '@/data'
 import { addDays, formatDay, todayIso, WEEKDAYS } from '@/dates'
 import { useResource } from '@/useResource'
 
@@ -57,6 +59,7 @@ export function RoutinesScreen() {
                 <p className="meta">
                   {describeSchedule(routine)}, from {formatDay(routine.start_date)} to{' '}
                   {formatDay(routine.end_date)}
+                  {routine.time_limit_minutes ? `, ${timeLimitLabel(routine.time_limit_minutes)} each time` : ''}
                 </p>
               </div>
               <button type="button" aria-label={`Edit “${routine.title}”`} onClick={() => setEditing(routine)}>
@@ -127,6 +130,9 @@ function RoutineForm({ routine, submitLabel, onSaved, onCancel }: RoutineFormPro
   const [startDate, setStartDate] = useState(routine?.start_date ?? todayIso())
   const [endDate, setEndDate] = useState(routine?.end_date ?? addDays(todayIso(), 90))
   const [goalId, setGoalId] = useState(routine?.goal_id ?? '')
+  const initialLimit = fromMinutes(routine?.time_limit_minutes ?? null)
+  const [limitAmount, setLimitAmount] = useState(initialLimit.amount)
+  const [limitUnit, setLimitUnit] = useState<TimeUnit>(initialLimit.unit)
   const [error, setError] = useState<string | null>(null)
 
   function toggleWeekday(day: number) {
@@ -143,6 +149,7 @@ function RoutineForm({ routine, submitLabel, onSaved, onCancel }: RoutineFormPro
       start_date: startDate,
       end_date: endDate,
       goal_id: goalId || null,
+      time_limit_minutes: toMinutes(limitAmount, limitUnit),
     }
     const { error: apiError } = routine
       ? await api.PATCH('/routines/{routine_id}', { params: { path: { routine_id: routine.id } }, body })
@@ -207,18 +214,20 @@ function RoutineForm({ routine, submitLabel, onSaved, onCancel }: RoutineFormPro
             />
           )}
         </Field>
-        <Field label="Goal">
-          {(id) => (
-            <select id={id} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
-              <option value="">No goal</option>
-              {goals.data?.map((goal) => (
-                <option key={goal.id} value={goal.id}>
-                  {goal.title}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        <TimeLimitField
+          amount={limitAmount}
+          unit={limitUnit}
+          onAmountChange={setLimitAmount}
+          onUnitChange={setLimitUnit}
+          info="Optional. The most time to spend each time the routine is due."
+        />
+        <GoalPicker
+          goals={goals.data ?? []}
+          value={goalId}
+          onChange={setGoalId}
+          onGoalCreated={() => void goals.reload()}
+          info="The goal this routine supports. Its count shows on the goal's card."
+        />
       </div>
       {frequency === 'weekly' && (
         <FieldGroup label="On these days">

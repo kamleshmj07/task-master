@@ -216,6 +216,7 @@ export function TasksScreen() {
         <EditTaskDialog
           task={editingTask}
           goals={goals.data ?? []}
+          onGoalCreated={() => void goals.reload()}
           onClose={() => setEditingTask(null)}
           onSaved={() => {
             setNotice(`Saved changes to “${editingTask.title}”.`)

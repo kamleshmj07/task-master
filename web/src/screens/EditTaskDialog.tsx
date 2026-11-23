@@ -3,6 +3,7 @@ import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { Field } from '@/components/Field'
+import { GoalPicker } from '@/components/GoalPicker'
 import { Modal } from '@/components/Modal'
 import { TimeLimitField } from '@/components/TimeLimitField'
 import { fromMinutes, plural, type TimeUnit, toMinutes } from '@/data'
@@ -14,13 +15,14 @@ interface EditTaskDialogProps {
   onSaved: () => void
   onDeleted: () => void
   onClose: () => void
+  onGoalCreated?: () => void
 }
 
 /**
  * Edit a task's title, goal, time limit and due date, or delete it. A due
  * date can be brought forward here; moving it later is a postponement.
  */
-export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose }: EditTaskDialogProps) {
+export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoalCreated }: EditTaskDialogProps) {
   const initialLimit = fromMinutes(task.time_limit_minutes)
   const [title, setTitle] = useState(task.title)
   const [goalId, setGoalId] = useState(task.goal_id ?? '')
@@ -95,18 +97,13 @@ export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose }: Edi
           {(id) => <input id={id} required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />}
         </Field>
         <div className="grid">
-          <Field label="Goal">
-            {(id) => (
-              <select id={id} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
-                <option value="">No goal</option>
-                {goals.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {goal.title}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          <GoalPicker
+            goals={goals}
+            value={goalId}
+            onChange={setGoalId}
+            {...(onGoalCreated ? { onGoalCreated } : {})}
+            info="The outcome this task moves you toward. Optional: everyday chores can stay goal-less or go under Essentials."
+          />
           <TimeLimitField
             amount={limitAmount}
             unit={limitUnit}

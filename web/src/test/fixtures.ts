@@ -30,6 +30,7 @@ export function makeRoutine(overrides: Partial<RoutineRead> = {}): RoutineRead {
     id: 'r1',
     goal_id: null,
     title: 'Workout',
+    time_limit_minutes: null,
     frequency: 'daily',
     weekdays: null,
     day_of_month: null,

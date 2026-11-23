@@ -2,7 +2,9 @@ import type { DueRoutine, PlanRead, TaskRead } from '@task-master/api-client'
 import { useCallback, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { Modal } from '@/components/Modal'
 import { addDays, formatDay, todayIso } from '@/dates'
+import { StepList } from '@/screens/TaskCard'
 import { PAGE_SIZE } from '@/usePagedTasks'
 import { useResource } from '@/useResource'
 
@@ -36,6 +38,8 @@ export function TodayScreen() {
     useCallback(() => loadOpenTasks(candidateLimit), [candidateLimit]),
   )
   const [error, setError] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<TaskRead | null>(null)
 
   const topThree = plan.data?.top_three ?? []
   const isPast = day < today
@@ -65,6 +69,15 @@ export function TodayScreen() {
     await Promise.all([plan.reload(), openTasks.reload()])
   }
 
+  async function handleConfirmComplete(task: TaskRead) {
+    await api.PATCH('/tasks/{task_id}', {
+      params: { path: { task_id: task.id } },
+      body: { status: 'done' },
+    })
+    setConfirming(null)
+    await Promise.all([plan.reload(), openTasks.reload()])
+  }
+
   const candidates = (openTasks.data ?? []).filter((task) => !ids.includes(task.id))
 
   return (
@@ -89,8 +102,12 @@ export function TodayScreen() {
         <h2>Top 3</h2>
         {topThree.length === 0 && <p className="muted">Pick up to three tasks that matter most.</p>}
         <ol className="list">
-          {topThree.map(({ rank, task }, index) => (
-            <li key={task.id} className="item row">
+          {topThree.map(({ rank, task }, index) => {
+            const open = openId === task.id
+            const finished = task.steps.filter((step) => step.done).length
+            return (
+            <li key={task.id} className="top-three-item">
+              <div className="item row">
               <span className="rank">{rank}</span>
               <input
                 type="checkbox"
@@ -104,6 +121,14 @@ export function TodayScreen() {
                   Next: {task.next_step ?? 'All steps done'}
                 </p>
               </div>
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-label={`${open ? 'Hide' : 'Show'} steps for “${task.title}”, ${finished} of ${task.steps.length} done`}
+                onClick={() => setOpenId(open ? null : task.id)}
+              >
+                Steps {finished}/{task.steps.length}
+              </button>
               {!isPast && (
                 <>
                   <button
@@ -131,8 +156,19 @@ export function TodayScreen() {
                   </button>
                 </>
               )}
+              </div>
+              {open && (
+                <StepList
+                  task={task}
+                  onChanged={(changed, allStepsDone) => {
+                    if (allStepsDone) setConfirming(changed)
+                    void plan.reload()
+                  }}
+                />
+              )}
             </li>
-          ))}
+            )
+          })}
         </ol>
         {!isPast && topThree.length < 3 && candidates.length > 0 && (
           <label>
@@ -165,6 +201,20 @@ export function TodayScreen() {
           </div>
         )}
       </div>
+
+      {confirming && (
+        <Modal title="Every step is done" onClose={() => setConfirming(null)}>
+          <p>Mark “{confirming.title}” complete?</p>
+          <div className="row">
+            <button type="button" className="primary" onClick={() => void handleConfirmComplete(confirming)}>
+              Mark complete
+            </button>
+            <button type="button" onClick={() => setConfirming(null)}>
+              Not yet
+            </button>
+          </div>
+        </Modal>
+      )}
 
       <RoutineChecklist
         day={day}

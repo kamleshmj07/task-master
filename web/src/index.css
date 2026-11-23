@@ -1193,3 +1193,28 @@ legend {
     padding-left: var(--space-5);
   }
 }
+
+.history-toggle {
+  padding: 0 var(--space-5) var(--space-5) 64px;
+}
+.history-toggle .history {
+  padding: var(--space-3) 0 0;
+}
+@media (max-width: 720px) {
+  .history-toggle {
+    padding-left: var(--space-5);
+  }
+}
+
+/* Today: a Top 3 task expands to its steps in place */
+.top-three-item {
+  border-radius: var(--radius-control);
+}
+.top-three-item .steps {
+  padding: var(--space-2) var(--space-4) var(--space-4) 56px;
+}
+@media (max-width: 720px) {
+  .top-three-item .steps {
+    padding-left: var(--space-4);
+  }
+}

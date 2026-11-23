@@ -112,12 +112,13 @@ export function TaskCard({
         </div>
       </div>
       {open && <StepList task={task} onChanged={onChanged} />}
-      {open && task.postpone_count > 0 && <PostponementHistory task={task} />}
+      {open && task.postpone_count > 0 && <HistoryToggle task={task} />}
     </article>
   )
 }
 
-function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>) {
+/** A task's steps as a numbered checklist; read-only once the task is done. */
+export function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>) {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState<number | null>(null)
@@ -125,7 +126,8 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
   // The step that just became next; it glows once to show what changed.
   const [glowId, setGlowId] = useState<string | null>(null)
   const nextIndex = task.steps.findIndex((step) => !step.done)
-  const canReorder = task.steps.length > 1
+  const finished = task.status === 'done'
+  const canReorder = !finished && task.steps.length > 1
 
   async function handleToggle(stepId: string, done: boolean) {
     const { data } = await api.PATCH('/tasks/{task_id}/steps/{step_id}', {
@@ -257,10 +259,11 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
                 type="checkbox"
                 className="tick"
                 checked={step.done}
+                disabled={finished}
                 onChange={() => void handleToggle(step.id, !step.done)}
               />
             </label>
-            {task.steps.length > 1 && (
+            {!finished && task.steps.length > 1 && (
               <button
                 type="button"
                 className="ghost icon"
@@ -275,6 +278,8 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
           </li>
         ))}
       </ol>
+      {finished && <p className="hint">This task is done, so its steps can no longer change. Reopen it to edit them.</p>}
+      {!finished && (
       <form className="row add-step" onSubmit={handleAdd}>
         <input
           className="grow"
@@ -287,6 +292,7 @@ function StepList({ task, onChanged }: Pick<TaskCardProps, 'task' | 'onChanged'>
         />
         <button type="submit">Add</button>
       </form>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -351,6 +357,19 @@ function PostponementHistory({ task }: { task: TaskRead }) {
           </li>
         ))}
       </ol>
+    </div>
+  )
+}
+
+/** "Show postponement history" button; the history loads only when opened. */
+function HistoryToggle({ task }: { task: TaskRead }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="history-toggle">
+      <button type="button" className="link" aria-expanded={shown} onClick={() => setShown(!shown)}>
+        {shown ? 'Hide postponement history' : 'Show postponement history'}
+      </button>
+      {shown && <PostponementHistory task={task} />}
     </div>
   )
 }
