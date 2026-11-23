@@ -9,6 +9,9 @@ specific to this repo.
 ## Working agreements with the user
 
 - Never start servers, commit, or push unless asked in that turn.
+- Never create a branch on your own: suggest one, say what it would be based
+  on, and wait for the OK. Branching from unmerged work mixes features into
+  one PR, so say so when that would happen.
 - Redesign the UI **page by page, flow by flow**. The Tasks page is done; the
   others (Today, Routines, Goals, Settings, then mobile) follow and should
   reuse its pieces (`Modal`, `TaskCard`, the step checklist, chips).
@@ -84,10 +87,15 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   Top 3.
 - **Top 3**: ranked one-off tasks for a day (today or later), shown beside
   the day's routines (`/plans/{date}`).
-- **Notifications**: the bell, its unread badge and the API exist, but
-  nothing creates notifications yet (tips no longer do). Decide which events
-  should before adding producers; the model is still shaped like a tip. Mark
-  read or all read.
+- **Notifications** (`alerts.py`), created when the app opens
+  (`POST /notifications/check`, safe to repeat; each event has a unique
+  `key`):
+  - an active goal's deadline is within 7 days (once per deadline)
+  - every task under an active goal is done (once per latest completion)
+  - an active goal has not moved for 30 days: no edit, new task, task
+    change or step tick (once per quiet spell)
+  - one summary a day when open tasks are due in the next 3 days
+  Each opens Goals or Tasks from the bell. Tips are never stored.
 - **Account**: `display_name` is asked on first sign-in (welcome dialog,
   cannot be skipped). `DELETE /users/me` with the current password deletes
   everything the user owns.
