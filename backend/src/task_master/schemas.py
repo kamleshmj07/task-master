@@ -18,6 +18,7 @@ from task_master.models import (
     POSTPONE_NOTE_MAX_LENGTH,
     GoalStatus,
     Notification,
+    NotificationKind,
     PostponeReason,
     RoutineFrequency,
     TaskStatus,
@@ -258,17 +259,15 @@ class SuggestionRead(BaseModel):
 
 
 class NotificationRead(BaseModel):
-    """A saved tip about a postponed task."""
+    """Something worth a look: a goal update or tasks coming due."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    task_id: uuid.UUID | None
-    task_title: str
-    reason: PostponeReason
-    headline: str
-    actions: list[str]
-    reflection: str | None
+    kind: NotificationKind
+    title: str
+    body: str
+    goal_id: uuid.UUID | None
     created_at: datetime
     read: bool
 

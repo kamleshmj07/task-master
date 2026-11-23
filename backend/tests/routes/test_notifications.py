@@ -7,7 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from task_master.models import Notification, PostponeReason
+from task_master.models import Notification, NotificationKind
 
 pytestmark = [pytest.mark.anyio, pytest.mark.db]
 
@@ -35,19 +35,19 @@ async def add_notification(
     client: AsyncClient,
     session: AsyncSession,
     headers: Headers,
-    title: str = "Tax",
-    task_id: uuid.UUID | None = None,
+    title: str = "Ship",
+    goal_id: uuid.UUID | None = None,
 ) -> None:
     """Store a notification for the user behind `headers`."""
     me = (await client.get("/users/me", headers=headers)).json()
     session.add(
         Notification(
             user_id=uuid.UUID(me["id"]),
-            task_id=task_id,
-            task_title=title,
-            reason=PostponeReason.DREADING,
-            headline="Lower the bar to starting",
-            actions=["Commit to just 5 minutes"],
+            kind=NotificationKind.GOAL_DEADLINE,
+            key=f"test:{uuid.uuid4()}",
+            title=title,
+            body="Check what is left to do.",
+            goal_id=goal_id,
         )
     )
     await session.flush()
@@ -64,7 +64,7 @@ class TestNotifications:
         result = await postpone_new_task(api_client, auth_headers, "dreading")
 
         assert result["suggestion"]["headline"] == "Lower the bar to starting"
-        assert await notifications(api_client, auth_headers) == []
+        assert [n["kind"] for n in await notifications(api_client, auth_headers)] == []
 
     async def test_lists_newest_first(
         self, api_client: AsyncClient, db_session: AsyncSession, auth_headers: Headers
@@ -74,7 +74,7 @@ class TestNotifications:
 
         listed = await notifications(api_client, auth_headers)
 
-        assert [n["task_title"] for n in listed] == ["Second", "First"]
+        assert [n["title"] for n in listed] == ["Second", "First"]
 
     async def test_counts_unread(
         self, api_client: AsyncClient, db_session: AsyncSession, auth_headers: Headers
@@ -114,19 +114,21 @@ class TestNotifications:
         )
         assert count.json() == {"unread": 0}
 
-    async def test_survives_deleting_the_task(
+    async def test_survives_deleting_the_goal(
         self, api_client: AsyncClient, db_session: AsyncSession, auth_headers: Headers
     ) -> None:
-        result = await postpone_new_task(api_client, auth_headers)
-        task_id = uuid.UUID(result["task"]["id"])
+        goal = await api_client.post(
+            "/goals", json={"title": "Ship"}, headers=auth_headers
+        )
+        goal_id = uuid.UUID(goal.json()["id"])
         await add_notification(
-            api_client, db_session, auth_headers, "Tax", task_id=task_id
+            api_client, db_session, auth_headers, "Ship", goal_id=goal_id
         )
 
-        await api_client.delete(f"/tasks/{task_id}", headers=auth_headers)
+        await api_client.delete(f"/goals/{goal_id}", headers=auth_headers)
 
         [saved] = await notifications(api_client, auth_headers)
-        assert (saved["task_id"], saved["task_title"]) == (None, "Tax")
+        assert (saved["goal_id"], saved["title"]) == (None, "Ship")
 
     async def test_hides_other_users_notifications(
         self,

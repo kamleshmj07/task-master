@@ -52,14 +52,17 @@ data: another user's goal, task or routine is reported as `404`. Lists take
 | `GET /routines/due?on=` | Routines due on a day, with done flag and streak |
 | `PUT/DELETE /routines/{id}/completions/{day}` | Tick a routine off for a day, or undo it |
 | `GET/PUT /plans/{date}` | A day's Top 3 tasks, shown beside its routines |
-| `GET /notifications`, `GET /notifications/unread-count` | Notifications, newest first (none are created yet) |
+| `POST /notifications/check` | Create any notifications now due, return the unread count; called when the app opens |
+| `GET /notifications`, `GET /notifications/unread-count` | Notifications, newest first |
 | `POST /notifications/{id}/read`, `POST /notifications/read-all` | Mark notifications as read |
 | `DELETE /users/me` | Delete the account and all its data; needs the current password |
 
 Each open task is in exactly one view: **Review** if every step is done or
 its due date has passed, otherwise **Scheduled** (dated) or **Someday**
 (undated). The fix returned by `/postpone` is shown once by the client and is
-not stored.
+not stored. Notifications cover goal deadlines within 7 days, goals whose tasks
+are all done, goals quiet for 30 days, and one daily summary of tasks due in
+the next 3 days; each event is notified once.
 
 A task's due date can be brought forward with `PATCH`, but moving it later or
 clearing it must go through `/postpone`, so every deferral is recorded.

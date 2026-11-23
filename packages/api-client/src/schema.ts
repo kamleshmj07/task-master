@@ -581,6 +581,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Check Notifications
+         * @description Create any notifications now due, then return the unread count.
+         *
+         *     Clients call this when the app opens. Repeating it is harmless: each
+         *     event is notified once.
+         */
+        post: operations["handle_check_notifications_notifications_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications/unread-count": {
         parameters: {
             query?: never;
@@ -811,8 +834,14 @@ export interface components {
             status: "ok";
         };
         /**
+         * NotificationKind
+         * @description Why a notification was created.
+         * @enum {string}
+         */
+        NotificationKind: "goal_deadline" | "goal_done" | "goal_stale" | "tasks_due_soon";
+        /**
          * NotificationRead
-         * @description A saved tip about a postponed task.
+         * @description Something worth a look: a goal update or tasks coming due.
          */
         NotificationRead: {
             /**
@@ -820,17 +849,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Task Id */
-            task_id: string | null;
-            /** Task Title */
-            task_title: string;
-            reason: components["schemas"]["PostponeReason"];
-            /** Headline */
-            headline: string;
-            /** Actions */
-            actions: string[];
-            /** Reflection */
-            reflection: string | null;
+            kind: components["schemas"]["NotificationKind"];
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Goal Id */
+            goal_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2761,6 +2786,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_check_notifications_notifications_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCount"];
                 };
             };
         };

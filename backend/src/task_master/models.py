@@ -373,27 +373,37 @@ class RoutineCompletion(Base):
     )
 
 
-class Notification(Base):
-    """Something worth coming back to, shown under the bell until read.
+class NotificationKind(StrEnum):
+    """Why a notification was created."""
 
-    For now these are the fixes suggested when a task is postponed.
+    GOAL_DEADLINE = "goal_deadline"  # an active goal's deadline is near
+    GOAL_DONE = "goal_done"  # every task under an active goal is finished
+    GOAL_STALE = "goal_stale"  # an active goal has not moved for a while
+    TASKS_DUE_SOON = "tasks_due_soon"  # one daily summary of tasks due soon
+
+
+class Notification(Base):
+    """Something worth a look, shown under the bell until read.
+
+    `key` identifies the event (e.g. one goal's deadline, or one day's
+    summary), so checking again never creates a duplicate.
     """
 
     __tablename__ = "notification"
+    __table_args__ = (UniqueConstraint("user_id", "key"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), index=True
     )
-    # The task it is about; kept (unlinked) if the task is later deleted.
-    task_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("task.id", ondelete="SET NULL"), index=True
+    kind: Mapped[NotificationKind] = mapped_column(_enum_column(NotificationKind))
+    key: Mapped[str] = mapped_column(String(200))
+    title: Mapped[str] = mapped_column(String(300))
+    body: Mapped[str] = mapped_column(Text)
+    # The goal it is about; kept (unlinked) if the goal is later deleted.
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("goal.id", ondelete="SET NULL"), index=True
     )
-    task_title: Mapped[str] = mapped_column(String(200))
-    reason: Mapped[PostponeReason] = mapped_column(_enum_column(PostponeReason))
-    headline: Mapped[str] = mapped_column(String(200))
-    actions: Mapped[list[str]] = mapped_column(ARRAY(Text))
-    reflection: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, index=True
     )
