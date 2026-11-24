@@ -202,6 +202,35 @@ class Task(TimestampMixin, Base):
         CheckConstraint("time_limit_minutes > 0", name="time_limit_positive"),
         CheckConstraint("postpone_count >= 0", name="postpone_count_non_negative"),
         UniqueConstraint("id", "user_id"),
+        # A repeating task's run is always dated, and carries exactly the
+        # schedule detail its frequency needs (like a routine).
+        CheckConstraint(
+            "repeat_frequency IS NULL OR (due_date IS NOT NULL"
+            " AND series_id IS NOT NULL)",
+            name="repeat_has_date_and_series",
+        ),
+        CheckConstraint(
+            "(repeat_frequency IS NOT DISTINCT FROM 'weekly')"
+            " = (repeat_weekdays IS NOT NULL)",
+            name="repeat_weekly_has_days",
+        ),
+        CheckConstraint(
+            "repeat_weekdays IS NULL OR (cardinality(repeat_weekdays) > 0"
+            " AND repeat_weekdays <@ ARRAY[0, 1, 2, 3, 4, 5, 6]::smallint[])",
+            name="repeat_weekdays_valid",
+        ),
+        CheckConstraint(
+            "(repeat_frequency IS NOT DISTINCT FROM 'monthly')"
+            " = (repeat_day_of_month IS NOT NULL)",
+            name="repeat_monthly_has_day",
+        ),
+        CheckConstraint(
+            "repeat_day_of_month BETWEEN 1 AND 31", name="repeat_day_of_month_range"
+        ),
+        CheckConstraint(
+            "repeat_until IS NULL OR repeat_frequency IS NOT NULL",
+            name="repeat_until_needs_repeat",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -218,6 +247,15 @@ class Task(TimestampMixin, Base):
     )
     postpone_count: Mapped[int] = mapped_column(default=0)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Repeating tasks (`repeats.py`): each run is a task; finishing one adds
+    # the next. Runs of one series share `series_id`.
+    repeat_frequency: Mapped[RoutineFrequency | None] = mapped_column(
+        _enum_column(RoutineFrequency)
+    )
+    repeat_weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
+    repeat_day_of_month: Mapped[int | None] = mapped_column(SmallInteger)
+    repeat_until: Mapped[date | None] = mapped_column(Date)
+    series_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     steps: Mapped[list[TaskStep]] = relationship(
         order_by="TaskStep.position, TaskStep.id",
         lazy="selectin",
@@ -228,6 +266,18 @@ class Task(TimestampMixin, Base):
     postponements: Mapped[list[TaskPostponement]] = relationship(
         lazy="selectin", viewonly=True
     )
+
+    @property
+    def repeat(self) -> dict[str, object] | None:
+        """The repeat rule, or None for a one-off task."""
+        if self.repeat_frequency is None:
+            return None
+        return {
+            "frequency": self.repeat_frequency,
+            "weekdays": self.repeat_weekdays,
+            "day_of_month": self.repeat_day_of_month,
+            "until": self.repeat_until,
+        }
 
     @property
     def postponement_reasons(self) -> dict[PostponeReason, int]:

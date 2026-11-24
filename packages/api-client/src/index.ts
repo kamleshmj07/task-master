@@ -22,6 +22,7 @@ export type PostponeResponse = Schemas['PostponeResponse']
 export type RoutineRead = Schemas['RoutineRead']
 export type RoutineCreate = Schemas['RoutineCreate']
 export type RoutineFrequency = Schemas['RoutineFrequency']
+export type TaskRepeat = Schemas['TaskRepeat']
 export type DueRoutine = Schemas['DueRoutine']
 export type PlanRead = Schemas['PlanRead']
 

@@ -11,12 +11,15 @@ from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import NowDep, SessionDep, local_today
 from task_master.models import Goal, Task, TaskStatus, TaskStep, utc_now
 from task_master.queries import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, get_owned_or_404
+from task_master.repeats import create_next_run
 from task_master.schemas import (
     TaskCounts,
     TaskCreate,
     TaskRead,
+    TaskRepeat,
     TaskUpdate,
     TaskView,
+    check_repeat_dates,
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -29,9 +32,12 @@ async def handle_create_task(
     """Create a task with its steps, optionally under one of the user's goals."""
     if body.goal_id is not None:
         await get_owned_or_404(session, Goal, body.goal_id, user.id)
+    task_id = uuid.uuid4()
     task = Task(
+        id=task_id,
         user_id=user.id,
-        **body.model_dump(exclude={"steps"}),
+        **body.model_dump(exclude={"steps", "repeat"}),
+        **_repeat_columns(body.repeat, series_id=task_id),
         steps=[
             TaskStep(position=position, text=text)
             for position, text in enumerate(body.steps)
@@ -113,16 +119,30 @@ async def handle_get_task(
 
 @router.patch("/{task_id}")
 async def handle_update_task(
-    task_id: uuid.UUID, body: TaskUpdate, user: CurrentUserDep, session: SessionDep
+    task_id: uuid.UUID,
+    body: TaskUpdate,
+    user: CurrentUserDep,
+    session: SessionDep,
+    now: NowDep,
 ) -> TaskRead:
-    """Change a task; moving it requires owning the destination goal."""
+    """Change a task; moving it requires owning the destination goal.
+
+    Finishing a run of a repeating task adds the series' next run.
+    """
     task = await get_owned_or_404(session, Task, task_id, user.id)
     changes = body.changes()
     _refuse_hidden_postponement(task, changes)
     if changes.get("goal_id") is not None:
         await get_owned_or_404(session, Goal, changes["goal_id"], user.id)
+    finishing = (
+        changes.get("status") == TaskStatus.DONE and task.status != TaskStatus.DONE
+    )
+    if "repeat" in changes:
+        changes |= _repeat_change(task, body.repeat, changes)
     for field, value in _with_completion(task, changes).items():
         setattr(task, field, value)
+    if finishing:
+        await create_next_run(session, task, local_today(user.timezone, now))
     await session.commit()
     await session.refresh(task)
     return TaskRead.model_validate(task)
@@ -136,6 +156,44 @@ async def handle_delete_task(
     task = await get_owned_or_404(session, Task, task_id, user.id)
     await session.delete(task)
     await session.commit()
+
+
+def _repeat_columns(
+    repeat: TaskRepeat | None, series_id: uuid.UUID | None
+) -> dict[str, Any]:
+    """Task columns for a repeat rule; all empty for a one-off task."""
+    if repeat is None:
+        return {
+            "repeat_frequency": None,
+            "repeat_weekdays": None,
+            "repeat_day_of_month": None,
+            "repeat_until": None,
+        }
+    return {
+        "repeat_frequency": repeat.frequency,
+        "repeat_weekdays": repeat.weekdays,
+        "repeat_day_of_month": repeat.day_of_month,
+        "repeat_until": repeat.until,
+        "series_id": series_id,
+    }
+
+
+def _repeat_change(
+    task: Task, repeat: TaskRepeat | None, changes: dict[str, Any]
+) -> dict[str, Any]:
+    """Columns for a changed repeat rule, checked against the task's date.
+
+    Stopping the repeat keeps `series_id`, so earlier runs stay linked.
+    """
+    del changes["repeat"]
+    due_date = changes.get("due_date", task.due_date)
+    try:
+        check_repeat_dates(repeat, due_date)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from error
+    return _repeat_columns(repeat, series_id=task.series_id or task.id)
 
 
 def _owned_tasks(
@@ -187,6 +245,11 @@ def _refuse_hidden_postponement(task: Task, changes: dict[str, Any]) -> None:
     """
     if "due_date" not in changes or task.due_date is None:
         return
+    if changes["due_date"] is None and task.repeat_frequency is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A repeating task always has a date; skip a run instead",
+        )
     new_date = changes["due_date"]
     if new_date is not None and new_date <= task.due_date:
         return

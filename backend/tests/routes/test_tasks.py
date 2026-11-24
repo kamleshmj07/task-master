@@ -66,6 +66,8 @@ class TestCreateTask:
             "status",
             "postpone_count",
             "postponement_reasons",
+            "repeat",
+            "series_id",
             "completed_at",
             "created_at",
             "updated_at",

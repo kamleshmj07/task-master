@@ -118,10 +118,34 @@ class GoalRead(GoalSummary):
     progress: GoalProgress
 
 
+class TaskRepeat(BaseModel):
+    """How a task repeats. Weekdays: 0 = Monday ... 6 = Sunday.
+
+    `until` is the last day a run may fall on; leave it out to repeat for
+    good.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    frequency: RoutineFrequency
+    weekdays: list[Weekday] | None = None
+    day_of_month: DayOfMonth | None = None
+    until: date | None = None
+
+    @model_validator(mode="after")
+    def check_rule(self) -> Self:
+        """Each frequency takes exactly the detail it needs."""
+        check_schedule(self.frequency, self.weekdays, self.day_of_month)
+        if self.weekdays is not None:
+            self.weekdays = sorted(set(self.weekdays))
+        return self
+
+
 class TaskCreate(BaseModel):
     """New task: its steps, in order, starting with a concrete first one.
 
-    Leaving out `due_date` puts the task in Someday.
+    Leaving out `due_date` puts the task in Someday. A repeating task needs a
+    `due_date`: the day of its first run.
     """
 
     goal_id: uuid.UUID | None = None
@@ -129,6 +153,23 @@ class TaskCreate(BaseModel):
     steps: list[StepText] = Field(min_length=1, max_length=MAX_STEPS)
     time_limit_minutes: TimeLimitMinutes | None = None
     due_date: date | None = None
+    repeat: TaskRepeat | None = None
+
+    @model_validator(mode="after")
+    def check_repeat(self) -> Self:
+        """A repeating task starts on a date and ends no earlier."""
+        check_repeat_dates(self.repeat, self.due_date)
+        return self
+
+
+def check_repeat_dates(repeat: TaskRepeat | None, due_date: date | None) -> None:
+    """Raise `ValueError` unless a repeat rule has a first run to start from."""
+    if repeat is None:
+        return
+    if due_date is None:
+        raise ValueError("A repeating task needs a due_date for its first run")
+    if repeat.until is not None and repeat.until < due_date:
+        raise ValueError("repeat.until must be on or after the due_date")
 
 
 class TaskUpdate(PatchModel):
@@ -144,6 +185,8 @@ class TaskUpdate(PatchModel):
     time_limit_minutes: TimeLimitMinutes | None = None
     due_date: date | None = None
     status: TaskStatus | None = None
+    # A rule makes the task repeat (or changes how); null stops it repeating.
+    repeat: TaskRepeat | None = None
 
 
 class TaskView(StrEnum):
@@ -227,6 +270,9 @@ class TaskRead(BaseModel):
     postpone_count: int
     # How many times it was postponed for each reason, e.g. {"blocked": 2}.
     postponement_reasons: dict[PostponeReason, int]
+    repeat: TaskRepeat | None
+    # Shared by every run of a repeating task.
+    series_id: uuid.UUID | None
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -247,6 +293,22 @@ class PostponeRequest(BaseModel):
     """Move a task to a later date, or to Someday with `to_date: null`."""
 
     to_date: date | None
+    reason: PostponeReason
+    note: PostponeNote | None = None
+
+    @model_validator(mode="after")
+    def require_note_for_other(self) -> Self:
+        """Blank notes count as none; `other` must explain itself."""
+        if self.note == "":
+            self.note = None
+        if self.reason is PostponeReason.OTHER and self.note is None:
+            raise ValueError("A note is required when the reason is 'other'")
+        return self
+
+
+class SkipRequest(BaseModel):
+    """Skip a repeating task's run: it moves to the next due day."""
+
     reason: PostponeReason
     note: PostponeNote | None = None
 
