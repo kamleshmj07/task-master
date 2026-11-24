@@ -4,6 +4,7 @@ import { api, errorMessage } from '@/api'
 import { useAuth } from '@/authContext'
 import { Field } from '@/components/Field'
 import { Modal } from '@/components/Modal'
+import { PasswordInput } from '@/components/PasswordInput'
 import { ProfileFields } from '@/components/ProfileFields'
 
 /** Profile details, password, and the option to delete the account. */
@@ -113,9 +114,9 @@ function ChangePasswordForm() {
       <div className="grid">
         <Field label="Current password">
           {(id) => (
-            <input
+            <PasswordInput
               id={id}
-              type="password"
+              what="current password"
               required
               autoComplete="current-password"
               maxLength={MAX_PASSWORD_LENGTH}
@@ -129,9 +130,9 @@ function ChangePasswordForm() {
           info={`${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters, without your email name. A few unrelated words make a strong one.`}
         >
           {(id) => (
-            <input
+            <PasswordInput
               id={id}
-              type="password"
+              what="new password"
               required
               autoComplete="new-password"
               minLength={MIN_PASSWORD_LENGTH}
@@ -143,9 +144,9 @@ function ChangePasswordForm() {
         </Field>
         <Field label="Confirm new password">
           {(id) => (
-            <input
+            <PasswordInput
               id={id}
-              type="password"
+              what="confirmed password"
               required
               autoComplete="new-password"
               maxLength={MAX_PASSWORD_LENGTH}
@@ -201,16 +202,18 @@ function DeleteAccountDialog({ onClose }: { onClose: () => void }) {
           Everything you have in Task Master will be deleted straight away. Enter your password to
           confirm.
         </p>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+        <Field label="Password">
+          {(id) => (
+            <PasswordInput
+              id={id}
+              required
+              autoComplete="current-password"
+              maxLength={128}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
+        </Field>
         {error && (
           <p role="alert" className="error">
             {error}

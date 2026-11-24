@@ -113,6 +113,14 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   `heads_up` (overdue, every step done, due within 3 days; at most 5;
   nothing already in the three) (`day_guide.py`). Unfinished tasks are
   suggested the next morning, never carried over automatically.
+- **First-run setup, "Light the lamp"** (`routes/onboarding.py`,
+  `LightTheLamp.tsx`): a card on Today with four steps done in place (a goal
+  of their own, a task with a tiny first step, a pick for the three, a
+  routine). Each lights one ray of a desk lamp. Progress is read from the
+  user's data; only `onboarded_at` is stored, set by "Start my day". "Not
+  now" hides it for the day (browser storage). Accounts that had tasks
+  before were marked set up by the migration. Tasks, Goals and Routines
+  have empty states with one sentence and one button.
 - **Notifications** (`alerts.py`), created when the app opens
   (`POST /notifications/check`, safe to repeat; each event has a unique
   `key`):
@@ -198,13 +206,14 @@ artifact (artboard "Tasks page – Desk lamp direction").
   passed. The old feature branches are deleted.
 - PR #3 (Phase 1) merged at `b9b938a`; its branch is kept for now (user
   will clean up later). PR #4 (security hardening) merged at `f6e62ba`.
-  Active branch: **`feature/today-redesign`**. Before
+  PR #5 (Today redesign) merged at `f5528de`. Active branch:
+  **`feature/onboarding`**. Before
   any other new work, suggest a branch and wait for the user's OK. Each
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `7b06cb22594e` (head).
-- Tests: 507 backend (98% coverage), 187 web, 3 api-client, all passing.
+- Dev database migrated to `674ce9fdd30a` (head).
+- Tests: 517 backend (98% coverage), 206 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 

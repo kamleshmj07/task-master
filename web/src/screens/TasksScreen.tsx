@@ -6,6 +6,7 @@ import { Modal } from '@/components/Modal'
 import { groupReview, groupScheduled, loadGoals, type TaskGroup } from '@/data'
 import { todayIso } from '@/dates'
 import { EditTaskDialog } from '@/screens/EditTaskDialog'
+import { EmptyState } from '@/components/EmptyState'
 import { NewTaskPanel } from '@/screens/NewTaskPanel'
 import { PostponeDialog, TipDialog } from '@/screens/PostponeForm'
 import { TaskCard } from '@/screens/TaskCard'
@@ -55,6 +56,8 @@ export function TasksScreen() {
 
   const inView = tasks.tasks ?? []
   const count = (id: View) => tasks.counts?.[id] ?? 0
+  const noTasksAtAll =
+    goalFilter === 'all' && tasks.counts !== null && VIEWS.every(({ id }) => count(id) === 0)
   const groups = groupsFor(view, inView, today)
 
   function handleChanged(_task: TaskRead, allStepsDone: boolean) {
@@ -161,7 +164,12 @@ export function TasksScreen() {
         </div>
       </div>
 
-      {tasks.tasks && groups.length === 0 && (
+      {noTasksAtAll && !adding && (
+        <EmptyState icon="tasks" title="Nothing on your list yet" actionLabel="New task" onAction={() => setAdding(true)}>
+          Pick something you've been putting off. Break it into steps, starting with one so small it's easy.
+        </EmptyState>
+      )}
+      {tasks.tasks && groups.length === 0 && !noTasksAtAll && (
         <div className="panel empty">
           <p className="title">Nothing here</p>
           <p className="muted">{EMPTY_HINTS[view]}</p>

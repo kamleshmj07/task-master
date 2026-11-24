@@ -1513,3 +1513,230 @@ label.today-routine:hover {
     padding-left: 0;
   }
 }
+
+/* Light the lamp: first-run setup on Today */
+.lamp-card {
+  display: flex;
+  flex-wrap: wrap;
+  background: var(--slate);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-dialog);
+  overflow: hidden;
+}
+.lamp-art {
+  flex: 1 1 240px;
+  background: var(--ink-bar);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 36px var(--space-6);
+}
+.lamp-art.glow {
+  background: radial-gradient(circle at 70% 75%, rgb(242 181 68 / 22%), var(--ink-bar) 62%);
+}
+.lamp-ray {
+  stroke: var(--line);
+  transition: stroke 600ms ease-out;
+}
+.lamp-ray.lit {
+  stroke: var(--lamp);
+}
+.lamp-count {
+  font-size: 15px;
+  color: var(--paper-soft);
+}
+.lamp-count.on {
+  color: var(--lamp);
+  font-weight: 700;
+}
+.lamp-body {
+  flex: 999 1 480px;
+  min-width: 0;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.lamp-body .top {
+  align-items: flex-start;
+}
+.lamp-body h2 {
+  font-size: 26px;
+  color: var(--paper-bright);
+}
+.lamp-card.lit .lamp-body h2 {
+  font-size: 30px;
+}
+.lamp-lede {
+  font-size: 16px;
+  color: var(--paper-soft);
+}
+.lamp-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lamp-step {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: 14px var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.lamp-step.current {
+  border-color: var(--lamp);
+  background: rgb(242 181 68 / 6%);
+  padding-block: 18px;
+}
+.lamp-node {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  color: var(--paper-muted);
+  font-weight: 800;
+  display: inline-grid;
+  place-items: center;
+}
+.lamp-node.lit {
+  border-color: var(--lamp);
+  color: var(--lamp);
+}
+.lamp-node.done {
+  border: none;
+  background: var(--done-bg);
+  color: var(--done-text);
+}
+.lamp-step-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--paper);
+}
+.lamp-step-title.current {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--paper-bright);
+}
+.lamp-step-done {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--paper-muted);
+}
+.lamp-quick {
+  align-items: flex-end;
+}
+.lamp-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+.lamp-how {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lamp-how li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.lamp-how-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--slate-raised);
+  color: var(--lamp);
+  display: inline-grid;
+  place-items: center;
+}
+.lamp-start {
+  min-height: 48px;
+  padding-inline: 22px;
+  font-weight: 800;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lamp-ray {
+    transition: none;
+  }
+}
+@media (max-width: 720px) {
+  .lamp-body {
+    padding: var(--space-5);
+  }
+  .lamp-step {
+    padding-inline: var(--space-4);
+  }
+}
+
+/* Empty states: one sentence on what the page is for, one way to start */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 40px var(--space-6);
+  border: 1px solid var(--line);
+}
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--slate-raised);
+  color: var(--lamp);
+  display: inline-grid;
+  place-items: center;
+}
+.empty-state h2 {
+  font-size: 20px;
+  color: var(--paper-bright);
+}
+.empty-state p {
+  max-width: 360px;
+  color: var(--paper-soft);
+}
+
+/* Password fields: an eye button inside the field shows what was typed */
+.password-field {
+  position: relative;
+  display: flex;
+}
+.password-field input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 52px;
+}
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--paper-muted);
+  display: inline-grid;
+  place-items: center;
+}
+.password-toggle:hover:not(:disabled),
+.password-toggle[aria-pressed='true'],
+.password-toggle[aria-pressed='true']:hover:not(:disabled) {
+  background: transparent;
+  color: var(--paper-bright);
+}

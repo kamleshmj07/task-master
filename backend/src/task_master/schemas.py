@@ -489,6 +489,38 @@ class PlanItem(BaseModel):
     task: TaskRead
 
 
+class OnboardingGoal(BaseModel):
+    """The goal that lit setup step 1."""
+
+    id: uuid.UUID
+    title: str
+
+
+class OnboardingTask(BaseModel):
+    """The task that lit setup step 2, with its first step."""
+
+    id: uuid.UUID
+    title: str
+    first_step: str | None
+
+
+class OnboardingRoutine(BaseModel):
+    """The routine that lit setup step 4."""
+
+    id: uuid.UUID
+    title: str
+
+
+class OnboardingRead(BaseModel):
+    """First-run setup: each step is done once its field is set (or true)."""
+
+    goal: OnboardingGoal | None
+    task: OnboardingTask | None
+    three: bool
+    routine: OnboardingRoutine | None
+    finished: bool
+
+
 class SuggestionKind(StrEnum):
     """Why a task is suggested for the day's three."""
 

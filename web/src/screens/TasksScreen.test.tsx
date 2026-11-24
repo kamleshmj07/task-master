@@ -355,6 +355,17 @@ describe('Repeating tasks', () => {
   })
 })
 
+describe('An empty task list', () => {
+  it('invites the first task', async () => {
+    mockData([])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New task' }))
+
+    expect(screen.getByRole('textbox', { name: 'Task' })).toBeInTheDocument()
+  })
+})
+
 describe('Finished tasks', () => {
   const finished = makeTask({ status: 'done', steps: [{ id: 's1', text: 'Only', done: true }] })
 

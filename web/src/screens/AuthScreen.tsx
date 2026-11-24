@@ -1,7 +1,9 @@
 import { type FormEvent, useState } from 'react'
 
 import { useAuth } from '@/authContext'
+import { Field } from '@/components/Field'
 import { InfoTip } from '@/components/InfoTip'
+import { PasswordInput } from '@/components/PasswordInput'
 
 type Mode = 'login' | 'register'
 
@@ -39,17 +41,19 @@ export function AuthScreen() {
             onChange={(event) => setEmail(event.target.value)}
           />
         </label>
-        <label>
-          Password
-          <input
-            type="password"
-            autoComplete={isLogin ? 'current-password' : 'new-password'}
-            required
-            minLength={isLogin ? undefined : 12}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
+        <Field label="Password">
+          {(id) => (
+            <PasswordInput
+              id={id}
+              autoComplete={isLogin ? 'current-password' : 'new-password'}
+              required
+              {...(isLogin ? {} : { minLength: 12 })}
+              maxLength={128}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          )}
+        </Field>
         {!isLogin && (
           <div className="row">
             <span className="muted small">Password rules</span>

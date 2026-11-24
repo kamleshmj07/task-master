@@ -19,6 +19,7 @@ from task_master.routes import (
     goals,
     health,
     notifications,
+    onboarding,
     plans,
     postponements,
     routines,
@@ -111,3 +112,4 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(routines.router)
     app.include_router(plans.router)
     app.include_router(notifications.router)
+    app.include_router(onboarding.router)

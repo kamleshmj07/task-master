@@ -2,10 +2,13 @@ import type { GoalRead, GoalStatus } from '@task-master/api-client'
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { EmptyState } from '@/components/EmptyState'
 import { Field } from '@/components/Field'
 import { Modal } from '@/components/Modal'
 import { goalHealth, plural } from '@/data'
 import { formatDay, todayIso } from '@/dates'
+import { DEFAULT_GOAL_TITLE } from '@/onboarding'
+import { focusFormUnder } from '@/emptyStates'
 import { useResource } from '@/useResource'
 
 async function loadAllGoals(): Promise<GoalRead[]> {
@@ -44,6 +47,18 @@ export function GoalsScreen() {
         <h2 id="new-goal-heading">New goal</h2>
         <GoalForm submitLabel="Add goal" onSaved={() => void goals.reload()} />
       </section>
+
+      {goals.data && goals.data.every((goal) => goal.title === DEFAULT_GOAL_TITLE) && (
+        <EmptyState
+          icon="goals"
+          title="What are you working toward?"
+          actionLabel="New goal"
+          onAction={() => focusFormUnder('new-goal-heading')}
+        >
+          A goal gives your tasks a reason, and shows how far you've come. Essentials is there for everyday
+          chores.
+        </EmptyState>
+      )}
 
       {SECTIONS.map(({ status, label }) => {
         const inSection = (goals.data ?? []).filter((goal) => goal.status === status)

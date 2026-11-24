@@ -22,6 +22,15 @@ beforeEach(() => {
 })
 
 describe('RoutinesScreen', () => {
+  it('invites the first routine when there are none', async () => {
+    mockApi.GET.mockReturnValue(ok([]))
+    render(<RoutinesScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New routine' }))
+
+    expect(screen.getByLabelText('Routine')).toHaveFocus()
+  })
+
   it('has no goal field', async () => {
     render(<RoutinesScreen />)
 

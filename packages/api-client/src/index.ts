@@ -27,6 +27,7 @@ export type DueRoutine = Schemas['DueRoutine']
 export type PlanRead = Schemas['PlanRead']
 export type PlanSuggestion = Schemas['PlanSuggestion']
 export type HeadsUpItem = Schemas['HeadsUpItem']
+export type OnboardingRead = Schemas['OnboardingRead']
 
 /** How a client reaches the API and finds its current access token. */
 export interface ApiClientOptions {

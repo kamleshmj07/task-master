@@ -10,6 +10,11 @@ export function greeting(now: Date, name: string | null | undefined): string {
   return name ? `${part}, ${name}` : part
 }
 
+/** "Welcome, Ada": the greeting until first-run setup is finished. */
+export function welcome(name: string | null | undefined): string {
+  return name ? `Welcome, ${name}` : 'Welcome'
+}
+
 /** "Tuesday 24 November", spelled out for the page heading. */
 export function longDay(iso: string): string {
   const [year = 0, month = 1, day = 1] = iso.split('-').map(Number)

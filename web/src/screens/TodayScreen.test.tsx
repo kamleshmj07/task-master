@@ -27,6 +27,8 @@ const USER: UserRead = {
   is_verified: false,
 }
 
+const SET_UP = { goal: null, task: null, three: true, routine: null, finished: true }
+
 const FOCUS = makeTask({
   id: 'a',
   title: 'Draft proposal',
@@ -53,10 +55,11 @@ function plan(overrides: Partial<PlanRead> = {}): PlanRead {
   }
 }
 
-function mockGets(planData: PlanRead, openTasks: TaskRead[] = []) {
+function mockGets(planData: PlanRead, openTasks: TaskRead[] = [], setup: object = SET_UP) {
   mockApi.GET.mockImplementation((path: string) => {
     if (path === '/plans/{plan_date}') return ok(planData)
     if (path === '/goals') return ok([makeGoal({ id: 'g1', title: 'Car' })])
+    if (path === '/onboarding') return ok(setup)
     return ok(openTasks)
   })
 }
@@ -282,6 +285,52 @@ describe('Routines and heads-up', () => {
     renderToday()
 
     expect(await screen.findByText('Nothing needs you today.')).toBeInTheDocument()
+  })
+})
+
+describe('First-run setup', () => {
+  const NEW = { goal: null, task: null, three: false, routine: null, finished: false }
+
+  it('welcomes a new user and shows the lamp', async () => {
+    mockGets(plan({ top_three: [] }), [], NEW)
+    renderToday()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Ada' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Light your lamp' })).toBeInTheDocument()
+  })
+
+  it('hides the lamp for today with Not now', async () => {
+    mockGets(plan({ top_three: [] }), [], NEW)
+    renderToday()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Not now' }))
+
+    expect(screen.queryByRole('heading', { name: 'Light your lamp' })).not.toBeInTheDocument()
+    window.localStorage.clear()
+  })
+
+  it('finishes setup with Start my day', async () => {
+    mockGets(plan(), [], {
+      goal: { id: 'g', title: 'Run a 10k' },
+      task: { id: 'a', title: 'Draft proposal', first_step: 'Find the policy' },
+      three: true,
+      routine: { id: 'r1', title: 'Workout' },
+      finished: false,
+    })
+    mockApi.POST.mockReturnValue(ok({}))
+    renderToday()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start my day' }))
+
+    expect(mockApi.POST).toHaveBeenCalledWith('/onboarding/finish')
+  })
+
+  it('never shows once setup is finished', async () => {
+    mockGets(plan())
+    renderToday()
+    await three()
+
+    expect(screen.queryByRole('heading', { name: 'Light your lamp' })).not.toBeInTheDocument()
   })
 })
 
