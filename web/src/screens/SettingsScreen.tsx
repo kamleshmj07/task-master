@@ -2,10 +2,11 @@ import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { useAuth } from '@/authContext'
+import { Field } from '@/components/Field'
 import { Modal } from '@/components/Modal'
 import { ProfileFields } from '@/components/ProfileFields'
 
-/** Profile details, and the option to delete the account. */
+/** Profile details, password, and the option to delete the account. */
 export function SettingsScreen() {
   const { user, setUser } = useAuth()
   const [name, setName] = useState(user?.display_name ?? '')
@@ -47,6 +48,8 @@ export function SettingsScreen() {
         </div>
       </form>
 
+      <ChangePasswordForm />
+
       <section className="card danger-zone stack" aria-labelledby="danger-heading">
         <h2 id="danger-heading">Delete account</h2>
         <p className="muted">
@@ -62,6 +65,118 @@ export function SettingsScreen() {
 
       {deleting && <DeleteAccountDialog onClose={() => setDeleting(false)} />}
     </section>
+  )
+}
+
+const MIN_PASSWORD_LENGTH = 12
+const MAX_PASSWORD_LENGTH = 128
+
+/**
+ * Change the password, confirming the current one. The API then signs the
+ * account out everywhere, this device included, so it ends with signing in.
+ */
+function ChangePasswordForm() {
+  const { logout } = useAuth()
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [changed, setChanged] = useState(false)
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (next !== confirm) {
+      setError('The new passwords do not match.')
+      return
+    }
+    if (next === current) {
+      setError('Choose a password different from the current one.')
+      return
+    }
+    setBusy(true)
+    const { error: apiError } = await api.PATCH('/users/me', {
+      body: { password: next, current_password: current },
+    })
+    setBusy(false)
+    if (apiError) {
+      setError(errorMessage(apiError))
+      return
+    }
+    setError(null)
+    setChanged(true)
+  }
+
+  return (
+    <form className="card stack" onSubmit={handleSubmit} aria-labelledby="password-heading">
+      <h2 id="password-heading">Change password</h2>
+      <div className="grid">
+        <Field label="Current password">
+          {(id) => (
+            <input
+              id={id}
+              type="password"
+              required
+              autoComplete="current-password"
+              maxLength={MAX_PASSWORD_LENGTH}
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field
+          label="New password"
+          info={`${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters, without your email name. A few unrelated words make a strong one.`}
+        >
+          {(id) => (
+            <input
+              id={id}
+              type="password"
+              required
+              autoComplete="new-password"
+              minLength={MIN_PASSWORD_LENGTH}
+              maxLength={MAX_PASSWORD_LENGTH}
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label="Confirm new password">
+          {(id) => (
+            <input
+              id={id}
+              type="password"
+              required
+              autoComplete="new-password"
+              maxLength={MAX_PASSWORD_LENGTH}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+          )}
+        </Field>
+      </div>
+      <p className="muted small">Changing it signs you out on every device, this one included.</p>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      <div>
+        <button type="submit" className="primary" disabled={busy}>
+          Change password
+        </button>
+      </div>
+      {changed && (
+        <Modal title="Password changed" onClose={() => void logout()}>
+          <p>You are signed out everywhere. Sign in again with your new password.</p>
+          <div className="row">
+            <button type="button" className="primary" onClick={() => void logout()}>
+              Sign in again
+            </button>
+          </div>
+        </Modal>
+      )}
+    </form>
   )
 }
 

@@ -60,6 +60,11 @@ export function errorMessage(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'detail' in error) {
     const { detail } = error as { detail: unknown }
     if (typeof detail === 'string') return humanize(detail)
+    // fastapi-users errors: {"code": "...", "reason": "..."}
+    if (typeof detail === 'object' && detail !== null && 'reason' in detail) {
+      const { reason } = detail as { reason: unknown }
+      if (typeof reason === 'string') return reason.endsWith('.') ? reason : `${reason}.`
+    }
     if (Array.isArray(detail) && detail.length > 0) {
       const first = detail[0] as { msg?: unknown }
       if (typeof first.msg === 'string') return first.msg.replace(/^Value error, /, '')

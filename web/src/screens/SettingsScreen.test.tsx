@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { type Auth, AuthContext } from '@/authContext'
 import { SettingsScreen } from '@/screens/SettingsScreen'
 import { findA11yViolations } from '@/test/axe'
-import { mockApi, ok } from '@/test/mockApi'
+import { fail, mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api')>()),
@@ -73,6 +73,56 @@ describe('SettingsScreen profile', () => {
     const { container } = renderSettings()
 
     expect(await findA11yViolations(container)).toEqual([])
+  })
+})
+
+describe('SettingsScreen password', () => {
+  async function fillPassword(current: string, next: string, confirm = next) {
+    await userEvent.type(screen.getByLabelText('Current password'), current)
+    await userEvent.type(screen.getByLabelText('New password'), next)
+    await userEvent.type(screen.getByLabelText('Confirm new password'), confirm)
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
+  }
+
+  it('sends the new password with the current one', async () => {
+    mockApi.PATCH.mockReturnValue(ok(USER))
+    renderSettings()
+
+    await fillPassword('correct-horse-battery', 'a-brand-new-passphrase')
+
+    expect(mockApi.PATCH).toHaveBeenCalledWith('/users/me', {
+      body: { password: 'a-brand-new-passphrase', current_password: 'correct-horse-battery' },
+    })
+  })
+
+  it('signs in again after the change', async () => {
+    mockApi.PATCH.mockReturnValue(ok(USER))
+    const { auth } = renderSettings()
+    await fillPassword('correct-horse-battery', 'a-brand-new-passphrase')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in again' }))
+
+    expect(auth.logout).toHaveBeenCalled()
+  })
+
+  it('catches a mistyped confirmation before sending', async () => {
+    renderSettings()
+
+    await fillPassword('correct-horse-battery', 'a-brand-new-passphrase', 'a-brand-new-passphrasE')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The new passwords do not match.')
+    expect(mockApi.PATCH).not.toHaveBeenCalled()
+  })
+
+  it('says when the current password is wrong', async () => {
+    mockApi.PATCH.mockReturnValue(
+      fail({ detail: { code: 'UPDATE_USER_INVALID_PASSWORD', reason: 'Current password is incorrect' } }),
+    )
+    renderSettings()
+
+    await fillPassword('not-my-password', 'a-brand-new-passphrase')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Current password is incorrect.')
   })
 })
 
