@@ -127,7 +127,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   - an active goal's deadline is within 7 days (once per deadline)
   - every task under an active goal is done (once per latest completion)
   - an active goal has not moved for 30 days: no edit, new task, task
-    change or step tick (once per quiet spell)
+    change or step tick (once per quiet spell). Essentials is included on
+    purpose (decided 2026-11-24): a quiet Essentials means the app fell out
+    of use
   - one summary a day when open tasks are due in the next 3 days
   Each opens Goals or Tasks from the bell. Tips are never stored.
 - **Account**: `display_name` is asked on first sign-in (welcome dialog,
@@ -179,8 +181,12 @@ artifact (artboard "Tasks page – Desk lamp direction").
   own `:hover` rule: the generic `button:hover` outranks them otherwise.
 - Task rows: title with its facts, then the next step as its own block
   ("Next step" label, amber text, amber left edge).
-- Done for the shell and Tasks page; Today, Routines and Goals inherit the
-  tokens but still need their own layout pass.
+- Done for the shell, Tasks, Today and onboarding. Goals and Routines
+  inherit the tokens; a fuller layout pass was deferred (not needed for
+  launch).
+- Phones (up to 720px): the main nav becomes a bottom tab bar with icons,
+  pop-ups become bottom sheets, the notifications panel spans the screen,
+  and rows with actions wrap their buttons under the title.
 
 ## Code conventions learned here
 
@@ -206,25 +212,26 @@ artifact (artboard "Tasks page – Desk lamp direction").
   passed. The old feature branches are deleted.
 - PR #3 (Phase 1) merged at `b9b938a`; its branch is kept for now (user
   will clean up later). PR #4 (security hardening) merged at `f6e62ba`.
-  PR #5 (Today redesign) merged at `f5528de`. Active branch:
-  **`feature/onboarding`**. Before
+  PR #5 (Today redesign) merged at `f5528de`, PR #6 (onboarding, show
+  password) at `0a21dfa`. Active branch: **`feature/phone-layout`**. Before
   any other new work, suggest a branch and wait for the user's OK. Each
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
 - Dev database migrated to `674ce9fdd30a` (head).
-- Tests: 517 backend (98% coverage), 206 web, 3 api-client, all passing.
+- Tests: 517 backend (98% coverage), 210 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
-1. Security hardening on `feature/security-hardening`: merge via PR.
-2. Redesign Today, mockup first (still has old layout and copy).
-3. Redesign Goals (progress per goal) and Routines (streaks, week view).
-4. Deployment: app container, production config, HTTPS, the web headers in
-   `docs/security.md`; schedule the clean-up job; settle the single-process
-   deploy concern above (or move counters to Redis).
-5. Email provider for password reset and verification.
-6. End-to-end browser tests (Playwright).
-7. Mobile UI (shares `packages/api-client`; own screens).
-8. Decide whether the default Essentials goal should be left out of the
-   "hasn't moved in 30 days" notification.
+1. Phone layout on `feature/phone-layout`: check on a real phone, merge via PR.
+2. Deployment: app container, production config, HTTPS, the web headers in
+   `docs/security.md`; schedule the clean-up job; backups; monitoring.
+3. Email provider for password reset and verification (also fixes sign-up
+   revealing taken emails).
+4. Parked security findings, to decide together before launch (also in
+   memory): the 24-hour password re-check pause can trap an intruder in;
+   the single API process and zero-downtime deploys.
+5. End-to-end browser tests (Playwright).
+6. Later: a fuller Goals and Routines layout pass; the mobile app (shares
+   `packages/api-client`); premium features (postponement insights, weekly
+   review, LLM review).
