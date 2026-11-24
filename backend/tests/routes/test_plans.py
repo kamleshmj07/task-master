@@ -45,6 +45,8 @@ class TestGetPlan:
             "plan_date": TODAY,
             "top_three": [],
             "routines": [],
+            "suggestions": [],
+            "heads_up": [],
         }
 
     async def test_keeps_routines_separate_from_top_three(

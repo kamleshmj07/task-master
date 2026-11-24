@@ -489,9 +489,50 @@ class PlanItem(BaseModel):
     task: TaskRead
 
 
+class SuggestionKind(StrEnum):
+    """Why a task is suggested for the day's three."""
+
+    LEFT_OVER = "left_over"  # in the day before's three, still open
+    OVERDUE = "overdue"
+    DUE_TODAY = "due_today"  # due on the plan's day
+    GOAL_NEXT = "goal_next"  # next task of a goal that has been quiet
+
+
+class PlanSuggestion(BaseModel):
+    """A task offered for an empty slot, and why."""
+
+    kind: SuggestionKind
+    task: TaskRead
+    # For `left_over`: its rank the day before.
+    previous_rank: int | None = None
+    # For `goal_next`: the goal it moves forward.
+    goal_title: str | None = None
+
+
+class HeadsUpKind(StrEnum):
+    """Why an open task needs a decision today."""
+
+    OVERDUE = "overdue"
+    READY = "ready"  # every step done; complete it?
+    DUE_SOON = "due_soon"  # due within the next few days
+
+
+class HeadsUpItem(BaseModel):
+    """One task that needs attention, outside the day's three."""
+
+    kind: HeadsUpKind
+    task: TaskRead
+
+
 class PlanRead(BaseModel):
-    """A day: its Top 3 tasks and, separately, its routines."""
+    """A day: its Top 3, its routines, and what helps plan it.
+
+    `suggestions` are offered while a slot is free on today or a later day.
+    `heads_up` is filled for today only.
+    """
 
     plan_date: date
     top_three: list[PlanItem]
     routines: list[DueRoutine]
+    suggestions: list[PlanSuggestion]
+    heads_up: list[HeadsUpItem]

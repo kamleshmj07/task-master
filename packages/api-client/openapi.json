@@ -2977,6 +2977,33 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HeadsUpItem": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/HeadsUpKind"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "task"
+        ],
+        "title": "HeadsUpItem",
+        "description": "One task that needs attention, outside the day's three."
+      },
+      "HeadsUpKind": {
+        "type": "string",
+        "enum": [
+          "overdue",
+          "ready",
+          "due_soon"
+        ],
+        "title": "HeadsUpKind",
+        "description": "Why an open task needs a decision today."
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -3120,16 +3147,71 @@
             },
             "type": "array",
             "title": "Routines"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PlanSuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "heads_up": {
+            "items": {
+              "$ref": "#/components/schemas/HeadsUpItem"
+            },
+            "type": "array",
+            "title": "Heads Up"
           }
         },
         "type": "object",
         "required": [
           "plan_date",
           "top_three",
-          "routines"
+          "routines",
+          "suggestions",
+          "heads_up"
         ],
         "title": "PlanRead",
-        "description": "A day: its Top 3 tasks and, separately, its routines."
+        "description": "A day: its Top 3, its routines, and what helps plan it.\n\n`suggestions` are offered while a slot is free on today or a later day.\n`heads_up` is filled for today only."
+      },
+      "PlanSuggestion": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SuggestionKind"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskRead"
+          },
+          "previous_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Rank"
+          },
+          "goal_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "task"
+        ],
+        "title": "PlanSuggestion",
+        "description": "A task offered for an empty slot, and why."
       },
       "PlanUpdate": {
         "properties": {
@@ -3688,6 +3770,17 @@
         "type": "object",
         "title": "StepUpdate",
         "description": "Rename a step, or tick it off (`done: true`) or back (`done: false`)."
+      },
+      "SuggestionKind": {
+        "type": "string",
+        "enum": [
+          "left_over",
+          "overdue",
+          "due_today",
+          "goal_next"
+        ],
+        "title": "SuggestionKind",
+        "description": "Why a task is suggested for the day's three."
       },
       "SuggestionRead": {
         "properties": {
