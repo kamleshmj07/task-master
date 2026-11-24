@@ -1709,3 +1709,34 @@ label.today-routine:hover {
   max-width: 360px;
   color: var(--paper-soft);
 }
+
+/* Password fields: an eye button inside the field shows what was typed */
+.password-field {
+  position: relative;
+  display: flex;
+}
+.password-field input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 52px;
+}
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--paper-muted);
+  display: inline-grid;
+  place-items: center;
+}
+.password-toggle:hover:not(:disabled),
+.password-toggle[aria-pressed='true'],
+.password-toggle[aria-pressed='true']:hover:not(:disabled) {
+  background: transparent;
+  color: var(--paper-bright);
+}
