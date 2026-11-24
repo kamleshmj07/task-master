@@ -122,6 +122,13 @@ class User(TimestampMixin, Base):
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     # Asked for on first sign-in; NULL until the user has told us.
     display_name: Mapped[str | None] = mapped_column(String(100))
+    # Wrong passwords given to re-check it (changing email or password,
+    # deleting the account), and how long such checks are refused once too
+    # many were wrong. Login has its own throttle (`auth/lockout.py`).
+    password_check_failures: Mapped[int] = mapped_column(default=0, server_default="0")
+    password_check_locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 def utc_now() -> datetime:

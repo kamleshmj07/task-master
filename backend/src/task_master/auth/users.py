@@ -21,10 +21,16 @@ from fastapi_users.schemas import BaseUserCreate, BaseUserUpdate
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.auth.db import AccessTokenDatabase, UserDatabase
+from task_master.auth.reauth import (
+    WrongPasswordError,
+    check_password,
+    clear_password_check_lock,
+    wrong_password_reason,
+)
 from task_master.auth.tokens import revoke_user_sessions
 from task_master.defaults import DEFAULT_GOAL_TITLE, DEFAULT_GOAL_WHY
 from task_master.dependencies import SessionDep, SettingsDep
-from task_master.models import Goal, User
+from task_master.models import Goal, User, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -70,21 +76,30 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         """Apply an update; email and password changes need the current password."""
         if _changes_credentials(user_update, user):
             current = getattr(user_update, "current_password", None) or ""
-            verified, _ = self.password_helper.verify_and_update(
-                current, user.hashed_password
-            )
-            if not verified:
+            try:
+                await check_password(
+                    self.session, self.password_helper, user, current, utc_now()
+                )
+            except WrongPasswordError as error:
                 logger.warning(
                     "Credential change refused: wrong current password",
                     extra={"event": "credential_change_refused"},
                 )
-                raise InvalidPasswordException(reason="Current password is incorrect")
+                raise InvalidPasswordException(
+                    reason=wrong_password_reason(error)
+                ) from error
         changes = user_update.model_dump(
             exclude_unset=True, exclude={"current_password"}
         )
         return await super().update(
             type(user_update).model_validate(changes), user, safe, request
         )
+
+    async def on_after_reset_password(
+        self, user: User, request: Request | None = None
+    ) -> None:
+        """A reset proves who it is: forget wrong re-check attempts."""
+        await clear_password_check_lock(self.session, user)
 
     async def on_after_register(
         self, user: User, request: Request | None = None
