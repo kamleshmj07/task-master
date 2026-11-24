@@ -1,10 +1,12 @@
 """Application configuration loaded from environment variables."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import PositiveInt, SecretStr
+from pydantic import PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MIN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -24,12 +26,36 @@ class Settings(BaseSettings):
     access_token_lifetime_seconds: int = 15 * 60
     refresh_token_lifetime_days: int = 30
     auth_rate_limit: str = "5/minute"
+    # Every other endpoint, per session (or per IP when signed out).
+    api_rate_limit: str = "300/minute"
+    api_write_rate_limit: str = "120/minute"
+    # All requests from one IP, whatever token they carry. Higher than the
+    # per-session budget so people sharing a network are not blocked.
+    api_ip_rate_limit: str = "600/minute"
+    # Proxies whose X-Forwarded-For is trusted, e.g. the host's load
+    # balancer. Empty: the connecting address is the client.
+    trusted_proxies: list[str] = []
     login_free_failures: PositiveInt = 5
     login_base_lock_seconds: PositiveInt = 60
     login_max_lock_seconds: PositiveInt = 15 * 60
     login_ip_failures: PositiveInt = 20
     login_ip_window_seconds: PositiveInt = 15 * 60
     completed_task_retention_days: PositiveInt = 90
+
+    @model_validator(mode="after")
+    def check_production(self) -> Self:
+        """Refuse to run production with development defaults."""
+        if self.environment != "production":
+            return self
+        if not self.cors_origins or any(
+            not origin.startswith("https://") for origin in self.cors_origins
+        ):
+            raise ValueError("Production cors_origins must be HTTPS origins")
+        if len(self.auth_secret.get_secret_value()) < MIN_SECRET_LENGTH:
+            raise ValueError(
+                f"Production auth_secret needs at least {MIN_SECRET_LENGTH} characters"
+            )
+        return self
 
 
 @lru_cache

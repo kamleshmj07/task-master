@@ -384,7 +384,7 @@ class TestCurrentUser:
 
         await api_client.patch(
             "/users/me",
-            json={"password": "a-brand-new-passphrase"},
+            json={"password": "a-brand-new-passphrase", "current_password": PASSWORD},
             headers=_bearer(access_token),
         )
 
@@ -393,6 +393,48 @@ class TestCurrentUser:
             "/auth/mobile/refresh", json={"refresh_token": refresh_token}
         )
         assert (me.status_code, refreshed.status_code) == (401, 401)
+
+    @pytest.mark.parametrize(
+        "change",
+        [{"password": "a-brand-new-passphrase"}, {"email": "new@example.com"}],
+    )
+    @pytest.mark.parametrize("current", [None, "wrong-password-entirely"])
+    async def test_credential_changes_need_the_current_password(
+        self, api_client: AsyncClient, change: dict[str, str], current: str | None
+    ) -> None:
+        access_token, _ = await _mobile_session(api_client)
+        body = change | ({"current_password": current} if current else {})
+
+        response = await api_client.patch(
+            "/users/me", json=body, headers=_bearer(access_token)
+        )
+
+        me = await api_client.get("/users/me", headers=_bearer(access_token))
+        assert (response.status_code, me.json()["email"]) == (400, EMAIL)
+
+    async def test_email_changes_with_the_current_password(
+        self, api_client: AsyncClient
+    ) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        response = await api_client.patch(
+            "/users/me",
+            json={"email": "new@example.com", "current_password": PASSWORD},
+            headers=_bearer(access_token),
+        )
+
+        assert response.json()["email"] == "new@example.com"
+
+    async def test_other_changes_need_no_password(
+        self, api_client: AsyncClient
+    ) -> None:
+        access_token, _ = await _mobile_session(api_client)
+
+        response = await api_client.patch(
+            "/users/me", json={"display_name": "Ada"}, headers=_bearer(access_token)
+        )
+
+        assert response.json()["display_name"] == "Ada"
 
     async def test_forbids_reading_other_accounts(
         self, api_client: AsyncClient

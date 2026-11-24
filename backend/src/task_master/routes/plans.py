@@ -1,6 +1,6 @@
 """Daily plan endpoints: the Top 3 tasks for a day, beside its routines."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import delete, select
@@ -26,6 +26,9 @@ from task_master.schemas import (
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
+# Far enough for any real plan; stops one account creating endless rows.
+MAX_PLAN_DAYS_AHEAD = 366
+
 
 @router.get("/{plan_date}")
 async def handle_get_plan(
@@ -50,6 +53,11 @@ async def handle_set_plan(
     may stay. Past days cannot be re-planned.
     """
     today = local_today(user.timezone, now)
+    if plan_date > today + timedelta(days=MAX_PLAN_DAYS_AHEAD):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Plans reach at most {MAX_PLAN_DAYS_AHEAD} days ahead",
+        )
     if plan_date < today:
         raise _unprocessable("Cannot plan a day that has passed")
     plan = await _get_or_create_plan(session, user, plan_date)

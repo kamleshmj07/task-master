@@ -189,3 +189,19 @@ class TestSetPlan:
         response = await set_plan(api_client, auth_headers, [task["id"]])
 
         assert response.json()["top_three"][0]["task"]["goal_id"] == goal.json()["id"]
+
+
+class TestPlanHorizon:
+    async def test_accepts_a_year_ahead(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        response = await set_plan(api_client, auth_headers, [], day="2027-11-23")
+
+        assert response.status_code == 200
+
+    async def test_refuses_further_ahead(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        response = await set_plan(api_client, auth_headers, [], day="2027-11-24")
+
+        assert response.status_code == 422

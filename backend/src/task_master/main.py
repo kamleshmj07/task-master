@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from task_master.auth import routes as auth_routes
 from task_master.auth.lockout import LockoutPolicy, LoginThrottle
@@ -13,6 +14,7 @@ from task_master.auth.schemas import UserCreate, UserRead, UserUpdate
 from task_master.auth.users import fastapi_users
 from task_master.config import Settings, get_settings
 from task_master.database import create_engine, create_session_factory
+from task_master.logging_setup import configure_logging
 from task_master.routes import (
     goals,
     health,
@@ -23,6 +25,8 @@ from task_master.routes import (
     steps,
     tasks,
 )
+from task_master.security import install_security
+from task_master.single_process import hold_single_process_lock
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -30,15 +34,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = create_engine(settings.database_url.get_secret_value())
 
+    is_production = settings.environment == "production"
+
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-        yield
-        await engine.dispose()
+        lock = await hold_single_process_lock(engine) if is_production else None
+        try:
+            yield
+        finally:
+            if lock is not None:
+                await lock.close()
+            await engine.dispose()
 
-    is_production = settings.environment == "production"
+    configure_logging()
     app = FastAPI(
         title=settings.app_name,
         docs_url=None if is_production else "/docs",
+        openapi_url=None if is_production else "/openapi.json",
         redoc_url=None,
         lifespan=lifespan,
     )
@@ -53,6 +65,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
+    install_security(app, settings)
+    if settings.trusted_proxies:
+        # Outermost, so rate limits and logs see the real client address.
+        app.add_middleware(
+            ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxies
+        )
     _include_routers(app)
     return app
 

@@ -123,7 +123,22 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   in the body. Reusing a refresh token revokes its family. Failed logins are
   throttled per account (backoff from 1 to 15 minutes) and per IP (20 per 15
   minutes). Password reset and email verification are not built (no email
-  provider yet).
+  provider yet). Changing the email or password needs `current_password`;
+  Settings has a Change password form (signs out everywhere afterwards).
+- **Security hardening** (`security.py`, details in `docs/security.md`):
+  security headers on every response (HSTS in production), API-wide rate
+  limits per session or IP (reads and writes separately), JSON security logs
+  without personal data (`logging_setup.py`), trusted proxies via
+  `TASK_MASTER_TRUSTED_PROXIES`, no OpenAPI schema in production, and
+  production refuses to start without HTTPS CORS origins and a 32+ character
+  secret.
+- **Single API process (decided 2026-11-24, a known shortcoming).** Rate
+  limit and throttle counters live in memory, so production holds a Postgres
+  advisory lock and a second process refuses to start (`single_process.py`).
+  Redis would lift this. Open concern, parked by the user until the end of
+  the production-readiness work: zero-downtime deploys start the new version
+  before stopping the old one, so the new one may refuse to start. Either the
+  host stops the old version first, or the new process waits for the lock.
 
 ## Visual design: "Desk lamp" (approved 2026-11-23)
 
@@ -172,22 +187,23 @@ artifact (artboard "Tasks page – Desk lamp direction").
 - `master` has everything so far: PR #1 (MVP) at `1b21d97` and PR #2 (Tasks
   page polish, Tips page, notifications) at `bcce44a`, both merged after CI
   passed. The old feature branches are deleted.
-- Active branch: **`feature/edit-goals-tasks-routines`** (Phase 1). Before
+- PR #3 (Phase 1) merged at `b9b938a`; its branch is kept for now (user
+  will clean up later). Active branch: **`feature/security-hardening`**. Before
   any other new work, suggest a branch and wait for the user's OK. Each
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
 - Dev database migrated to `ca3d3959383b` (head).
-- Tests: 450 backend (98% coverage), 173 web, 3 api-client, all passing.
+- Tests: 487 backend (98% coverage), 177 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
-1. Phase 1 (editing tasks, goals and routines; goal progress; postponement
-   history; repeating tasks) is built on `feature/edit-goals-tasks-routines`; merge it via PR.
+1. Security hardening on `feature/security-hardening`: merge via PR.
 2. Redesign Today, mockup first (still has old layout and copy).
 3. Redesign Goals (progress per goal) and Routines (streaks, week view).
-4. Deployment: app container, production config, HTTPS; schedule the
-   clean-up job; Redis for login throttling and uvicorn's trusted proxy.
+4. Deployment: app container, production config, HTTPS, the web headers in
+   `docs/security.md`; schedule the clean-up job; settle the single-process
+   deploy concern above (or move counters to Redis).
 5. Email provider for password reset and verification.
 6. End-to-end browser tests (Playwright).
 7. Mobile UI (shares `packages/api-client`; own screens).

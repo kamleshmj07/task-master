@@ -38,10 +38,15 @@ class UserCreate(schemas.BaseUserCreate):
 
 
 class UserUpdate(schemas.BaseUserUpdate):
-    """Partial account update."""
+    """Partial account update.
+
+    Changing the email or password needs `current_password`, so a stolen
+    session cannot take the account over.
+    """
 
     timezone: Timezone | None = None
     display_name: DisplayName | None = None
+    current_password: str | None = Field(default=None, max_length=128)
 
 
 class AccessTokenResponse(BaseModel):
