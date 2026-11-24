@@ -1403,6 +1403,9 @@ export interface components {
         /**
          * UserUpdate
          * @description Partial account update.
+         *
+         *     Changing the email or password needs `current_password`, so a stolen
+         *     session cannot take the account over.
          */
         UserUpdate: {
             /** Password */
@@ -1419,6 +1422,8 @@ export interface components {
             timezone?: string | null;
             /** Display Name */
             display_name?: string | null;
+            /** Current Password */
+            current_password?: string | null;
         };
         /** ValidationError */
         ValidationError: {

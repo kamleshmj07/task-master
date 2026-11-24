@@ -4379,11 +4379,23 @@
               }
             ],
             "title": "Display Name"
+          },
+          "current_password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Password"
           }
         },
         "type": "object",
         "title": "UserUpdate",
-        "description": "Partial account update."
+        "description": "Partial account update.\n\nChanging the email or password needs `current_password`, so a stolen\nsession cannot take the account over."
       },
       "ValidationError": {
         "properties": {

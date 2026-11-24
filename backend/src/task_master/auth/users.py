@@ -1,5 +1,6 @@
 """fastapi-users wiring: user manager, access-token strategy and current user."""
 
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -16,7 +17,7 @@ from fastapi_users.authentication import (
     BearerTransport,
 )
 from fastapi_users.authentication.strategy import DatabaseStrategy
-from fastapi_users.schemas import BaseUserCreate
+from fastapi_users.schemas import BaseUserCreate, BaseUserUpdate
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.auth.db import AccessTokenDatabase, UserDatabase
@@ -24,6 +25,8 @@ from task_master.auth.tokens import revoke_user_sessions
 from task_master.defaults import DEFAULT_GOAL_TITLE, DEFAULT_GOAL_WHY
 from task_master.dependencies import SessionDep, SettingsDep
 from task_master.models import Goal, User
+
+logger = logging.getLogger(__name__)
 
 MIN_PASSWORD_LENGTH = 12
 MAX_PASSWORD_LENGTH = 128
@@ -57,6 +60,32 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 reason="Password must not contain your email"
             )
 
+    async def update(
+        self,
+        user_update: BaseUserUpdate,
+        user: User,
+        safe: bool = False,
+        request: Request | None = None,
+    ) -> User:
+        """Apply an update; email and password changes need the current password."""
+        if _changes_credentials(user_update, user):
+            current = getattr(user_update, "current_password", None) or ""
+            verified, _ = self.password_helper.verify_and_update(
+                current, user.hashed_password
+            )
+            if not verified:
+                logger.warning(
+                    "Credential change refused: wrong current password",
+                    extra={"event": "credential_change_refused"},
+                )
+                raise InvalidPasswordException(reason="Current password is incorrect")
+        changes = user_update.model_dump(
+            exclude_unset=True, exclude={"current_password"}
+        )
+        return await super().update(
+            type(user_update).model_validate(changes), user, safe, request
+        )
+
     async def on_after_register(
         self, user: User, request: Request | None = None
     ) -> None:
@@ -75,6 +104,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         """Log the user out everywhere after a password change."""
         if update_dict.get("password") is not None:
             await revoke_user_sessions(self.session, user.id)
+
+
+def _changes_credentials(user_update: BaseUserUpdate, user: User) -> bool:
+    """Whether the update sets a new password or a different email."""
+    if user_update.password is not None:
+        return True
+    return user_update.email is not None and user_update.email != user.email
 
 
 async def get_user_db(session: SessionDep) -> AsyncIterator[UserDatabase]:
