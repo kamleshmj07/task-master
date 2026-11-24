@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import NowDep, SessionDep
-from task_master.models import Task, TaskStep
+from task_master.models import Task, TaskStatus, TaskStep
 from task_master.queries import get_owned_or_404
 from task_master.schemas import (
     MAX_STEPS,
@@ -25,7 +25,7 @@ async def handle_add_step(
     task_id: uuid.UUID, body: StepCreate, user: CurrentUserDep, session: SessionDep
 ) -> TaskRead:
     """Add a step to the end of a task."""
-    task = await get_owned_or_404(session, Task, task_id, user.id)
+    task = await _open_task(session, task_id, user.id)
     if len(task.steps) >= MAX_STEPS:
         raise _unprocessable(f"A task can have at most {MAX_STEPS} steps")
     last = await session.scalar(
@@ -40,7 +40,7 @@ async def handle_reorder_steps(
     task_id: uuid.UUID, body: StepOrder, user: CurrentUserDep, session: SessionDep
 ) -> TaskRead:
     """Put the task's steps in the given order; every step must be listed once."""
-    task = await get_owned_or_404(session, Task, task_id, user.id)
+    task = await _open_task(session, task_id, user.id)
     by_id = {step.id: step for step in task.steps}
     if len(body.step_ids) != len(by_id) or set(body.step_ids) != set(by_id):
         raise _unprocessable("List every step of the task exactly once")
@@ -62,7 +62,7 @@ async def handle_update_step(
     now: NowDep,
 ) -> TaskRead:
     """Rename a step or tick it off. Ticking never completes the task itself."""
-    task = await get_owned_or_404(session, Task, task_id, user.id)
+    task = await _open_task(session, task_id, user.id)
     step = _step_of(task, step_id)
     changes = body.changes()
     if "text" in changes:
@@ -77,12 +77,25 @@ async def handle_delete_step(
     task_id: uuid.UUID, step_id: uuid.UUID, user: CurrentUserDep, session: SessionDep
 ) -> TaskRead:
     """Remove a step. A task always keeps at least one."""
-    task = await get_owned_or_404(session, Task, task_id, user.id)
+    task = await _open_task(session, task_id, user.id)
     step = _step_of(task, step_id)
     if len(task.steps) == 1:
         raise _unprocessable("A task needs at least one step")
     task.steps.remove(step)
     return await _saved(session, task)
+
+
+async def _open_task(
+    session: SessionDep, task_id: uuid.UUID, user_id: uuid.UUID
+) -> Task:
+    """The user's task, refused once it is done: its steps are then a record."""
+    task = await get_owned_or_404(session, Task, task_id, user_id)
+    if task.status is TaskStatus.DONE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A finished task's steps cannot change; reopen the task first",
+        )
+    return task
 
 
 def _step_of(task: Task, step_id: uuid.UUID) -> TaskStep:

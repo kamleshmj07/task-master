@@ -32,9 +32,9 @@ class TestSettings:
         assert load_settings().environment == "development"
 
     def test_reads_prefixed_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("TASK_MASTER_ENVIRONMENT", "production")
+        monkeypatch.setenv("TASK_MASTER_ENVIRONMENT", "test")
 
-        assert load_settings().environment == "production"
+        assert load_settings().environment == "test"
 
     def test_parses_cors_origins_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("TASK_MASTER_CORS_ORIGINS", '["https://a.com"]')

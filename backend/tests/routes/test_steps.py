@@ -277,3 +277,75 @@ class TestReorderSteps:
         )
 
         assert response.status_code == 404
+
+
+class TestFinishedTaskSteps:
+    """A finished task's steps are a record; reopen the task to change them."""
+
+    async def finished_task(
+        self, client: AsyncClient, headers: Headers
+    ) -> dict[str, Any]:
+        task = await new_task(client, headers)
+        await client.patch(
+            f"/tasks/{task['id']}", json={"status": "done"}, headers=headers
+        )
+        return task
+
+    async def test_refuses_adding(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await self.finished_task(api_client, auth_headers)
+
+        response = await api_client.post(
+            step_url(task), json={"text": "More"}, headers=auth_headers
+        )
+
+        assert response.status_code == 409
+
+    async def test_refuses_ticking(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await self.finished_task(api_client, auth_headers)
+
+        response = await api_client.patch(
+            step_url(task, 0), json={"done": True}, headers=auth_headers
+        )
+
+        assert response.status_code == 409
+
+    async def test_refuses_removing(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await self.finished_task(api_client, auth_headers)
+
+        response = await api_client.delete(step_url(task, 0), headers=auth_headers)
+
+        assert response.status_code == 409
+
+    async def test_refuses_reordering(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await self.finished_task(api_client, auth_headers)
+        reversed_ids = [step["id"] for step in reversed(task["steps"])]
+
+        response = await api_client.put(
+            f"{step_url(task)}/order",
+            json={"step_ids": reversed_ids},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 409
+
+    async def test_reopened_task_can_change_again(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        task = await self.finished_task(api_client, auth_headers)
+        await api_client.patch(
+            f"/tasks/{task['id']}", json={"status": "todo"}, headers=auth_headers
+        )
+
+        response = await api_client.post(
+            step_url(task), json={"text": "More"}, headers=auth_headers
+        )
+
+        assert response.status_code == 201
