@@ -12,7 +12,6 @@ from sqlalchemy.dialects.postgresql import insert
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import NowDep, SessionDep, local_today
 from task_master.models import (
-    Goal,
     Routine,
     RoutineCompletion,
     RoutineFrequency,
@@ -35,8 +34,6 @@ async def handle_create_routine(
     body: RoutineCreate, user: CurrentUserDep, session: SessionDep
 ) -> RoutineRead:
     """Create a routine, optionally under one of the user's goals."""
-    if body.goal_id is not None:
-        await get_owned_or_404(session, Goal, body.goal_id, user.id)
     routine = Routine(user_id=user.id, **body.model_dump())
     session.add(routine)
     await session.commit()
@@ -95,8 +92,6 @@ async def handle_update_routine(
     """Change a routine. Switching frequency drops details it no longer uses."""
     routine = await get_owned_or_404(session, Routine, routine_id, user.id)
     changes = body.changes()
-    if changes.get("goal_id") is not None:
-        await get_owned_or_404(session, Goal, changes["goal_id"], user.id)
     merged = _merged_schedule(routine, changes)
     for field, value in merged.items():
         setattr(routine, field, value)

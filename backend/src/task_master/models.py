@@ -328,19 +328,14 @@ class DailyPlanItem(Base):
 
 
 class Routine(TimestampMixin, Base):
-    """A recurring item, ticked off on each day it is due.
+    """A recurring chore, ticked off on each day it is due.
 
-    Unlike tasks, routines are never postponed and never enter the Top 3:
-    a missed day simply stays unticked.
+    Routines stand alone: no goal, no steps. Unlike tasks they are never
+    postponed and never enter the Top 3; a missed day simply stays unticked.
     """
 
     __tablename__ = "routine"
     __table_args__ = (
-        ForeignKeyConstraint(
-            ["goal_id", "user_id"],
-            ["goal.id", "goal.user_id"],
-            ondelete="CASCADE",
-        ),
         UniqueConstraint("id", "user_id"),
         CheckConstraint("end_date >= start_date", name="ends_after_start"),
         CheckConstraint("time_limit_minutes > 0", name="time_limit_positive"),
@@ -363,7 +358,6 @@ class Routine(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), index=True
     )
-    goal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     title: Mapped[str] = mapped_column(String(200))
     # Most time to spend each time it is due, like a task's time limit.
     time_limit_minutes: Mapped[int | None]

@@ -245,7 +245,7 @@ export interface paths {
         post?: never;
         /**
          * Handle Delete Goal
-         * @description Delete a goal and, by cascade, its tasks and routines.
+         * @description Delete a goal and, by cascade, its tasks.
          */
         delete: operations["handle_delete_goal_goals__goal_id__delete"];
         options?: never;
@@ -779,8 +779,6 @@ export interface components {
             total_tasks: number;
             /** Done Tasks */
             done_tasks: number;
-            /** Routine Count */
-            routine_count: number;
             next_due_task: components["schemas"]["NextDueTask"] | null;
             /**
              * Last Moved At
@@ -1017,8 +1015,6 @@ export interface components {
             end_date: string;
             /** Title */
             title: string;
-            /** Goal Id */
-            goal_id?: string | null;
             /** Time Limit Minutes */
             time_limit_minutes?: number | null;
         };
@@ -1038,8 +1034,6 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Goal Id */
-            goal_id: string | null;
             /** Title */
             title: string;
             /** Time Limit Minutes */
@@ -1077,8 +1071,6 @@ export interface components {
         RoutineUpdate: {
             /** Title */
             title?: string | null;
-            /** Goal Id */
-            goal_id?: string | null;
             /** Time Limit Minutes */
             time_limit_minutes?: number | null;
             frequency?: components["schemas"]["RoutineFrequency"] | null;

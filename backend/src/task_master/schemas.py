@@ -107,7 +107,6 @@ class GoalProgress(BaseModel):
 
     total_tasks: int
     done_tasks: int
-    routine_count: int
     next_due_task: NextDueTask | None
     # Last edit to the goal, change to one of its tasks, or step ticked.
     last_moved_at: datetime
@@ -366,7 +365,6 @@ class RoutineCreate(RoutineSchedule):
     """New routine. Weekdays: 0 = Monday ... 6 = Sunday."""
 
     title: Title
-    goal_id: uuid.UUID | None = None
     time_limit_minutes: TimeLimitMinutes | None = None
 
 
@@ -376,7 +374,6 @@ class RoutineUpdate(PatchModel):
     REQUIRED_IF_SET = frozenset({"title", "frequency", "start_date", "end_date"})
 
     title: Title | None = None
-    goal_id: uuid.UUID | None = None
     time_limit_minutes: TimeLimitMinutes | None = None
     frequency: RoutineFrequency | None = None
     weekdays: list[Weekday] | None = None
@@ -391,7 +388,6 @@ class RoutineRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    goal_id: uuid.UUID | None
     title: str
     time_limit_minutes: int | None
     frequency: RoutineFrequency

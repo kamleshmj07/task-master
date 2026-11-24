@@ -1,4 +1,4 @@
-"""Goal progress: task counts, routines, the next task due, and last movement.
+"""Goal progress: task counts, the next task due, and last movement.
 
 Loaded for many goals in a handful of queries, never one query per goal.
 """
@@ -11,7 +11,7 @@ from sqlalchemy import ColumnElement, DateTime, Select, func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from task_master.models import Goal, Routine, Task, TaskStatus, TaskStep
+from task_master.models import Goal, Task, TaskStatus, TaskStep
 from task_master.schemas import GoalProgress, GoalRead, GoalSummary, NextDueTask
 
 
@@ -53,14 +53,12 @@ async def load_progress(
     if not goal_ids:
         return {}
     counts = await _task_counts(session, goal_ids)
-    routines = await _routine_counts(session, goal_ids)
     next_due = await _next_due(session, goal_ids)
     moved = await _last_moved(session, goal_ids)
     return {
         goal_id: GoalProgress(
             total_tasks=counts.get(goal_id, (0, 0))[0],
             done_tasks=counts.get(goal_id, (0, 0))[1],
-            routine_count=routines.get(goal_id, 0),
             next_due_task=next_due.get(goal_id),
             last_moved_at=moved[goal_id],
         )
@@ -81,17 +79,6 @@ async def _task_counts(
         .group_by(Task.goal_id)
     )
     return {goal_id: (total, done) for goal_id, total, done in rows if goal_id}
-
-
-async def _routine_counts(
-    session: AsyncSession, goal_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, int]:
-    rows = await session.execute(
-        select(Routine.goal_id, func.count(Routine.id))
-        .where(Routine.goal_id.in_(goal_ids))
-        .group_by(Routine.goal_id)
-    )
-    return {goal_id: count for goal_id, count in rows if goal_id}
 
 
 async def _next_due(

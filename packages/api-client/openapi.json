@@ -931,7 +931,7 @@
           "goals"
         ],
         "summary": "Handle Delete Goal",
-        "description": "Delete a goal and, by cascade, its tasks and routines.",
+        "description": "Delete a goal and, by cascade, its tasks.",
         "operationId": "handle_delete_goal_goals__goal_id__delete",
         "security": [
           {
@@ -2750,10 +2750,6 @@
             "type": "integer",
             "title": "Done Tasks"
           },
-          "routine_count": {
-            "type": "integer",
-            "title": "Routine Count"
-          },
           "next_due_task": {
             "anyOf": [
               {
@@ -2774,7 +2770,6 @@
         "required": [
           "total_tasks",
           "done_tasks",
-          "routine_count",
           "next_due_task",
           "last_moved_at"
         ],
@@ -3301,18 +3296,6 @@
             "minLength": 1,
             "title": "Title"
           },
-          "goal_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Goal Id"
-          },
           "time_limit_minutes": {
             "anyOf": [
               {
@@ -3353,18 +3336,6 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
-          },
-          "goal_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Goal Id"
           },
           "title": {
             "type": "string",
@@ -3433,7 +3404,6 @@
         "type": "object",
         "required": [
           "id",
-          "goal_id",
           "title",
           "time_limit_minutes",
           "frequency",
@@ -3461,18 +3431,6 @@
               }
             ],
             "title": "Title"
-          },
-          "goal_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Goal Id"
           },
           "time_limit_minutes": {
             "anyOf": [

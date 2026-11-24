@@ -285,9 +285,8 @@ class TestGoalProgress:
         assert (
             progress["total_tasks"],
             progress["done_tasks"],
-            progress["routine_count"],
             progress["next_due_task"],
-        ) == (0, 0, 0, None)
+        ) == (0, 0, None)
 
     async def test_counts_tasks_and_finished_ones(
         self, api_client: AsyncClient, auth_headers: Headers
@@ -320,25 +319,12 @@ class TestGoalProgress:
 
         assert response.json()["progress"]["next_due_task"]["title"] == "Sooner"
 
-    async def test_counts_routines(
+    async def test_progress_says_nothing_about_routines(
         self, api_client: AsyncClient, auth_headers: Headers
     ) -> None:
         goal = await create_goal(api_client, auth_headers)
-        await api_client.post(
-            "/routines",
-            json={
-                "title": "Run",
-                "frequency": "daily",
-                "start_date": "2026-01-01",
-                "end_date": "2026-12-31",
-                "goal_id": goal["id"],
-            },
-            headers=auth_headers,
-        )
 
-        response = await api_client.get(f"/goals/{goal['id']}", headers=auth_headers)
-
-        assert response.json()["progress"]["routine_count"] == 1
+        assert "routine_count" not in goal["progress"]
 
     async def test_lists_progress_for_every_goal(
         self, api_client: AsyncClient, auth_headers: Headers

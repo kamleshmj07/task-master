@@ -71,7 +71,7 @@ async def handle_update_goal(
 async def handle_delete_goal(
     goal_id: uuid.UUID, user: CurrentUserDep, session: SessionDep
 ) -> None:
-    """Delete a goal and, by cascade, its tasks and routines."""
+    """Delete a goal and, by cascade, its tasks."""
     goal = await get_owned_or_404(session, Goal, goal_id, user.id)
     await session.delete(goal)
     await session.commit()
