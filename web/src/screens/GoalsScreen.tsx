@@ -37,7 +37,7 @@ export function GoalsScreen() {
         <h1 id="goals-heading" className="page-title">
           Goals
         </h1>
-        <p className="muted lede">The outcomes your tasks and routines move you toward.</p>
+        <p className="muted lede">The outcomes your tasks move you toward.</p>
       </div>
 
       <section className="card stack" aria-labelledby="new-goal-heading">
@@ -85,9 +85,8 @@ export function GoalsScreen() {
         <Modal title="Delete this goal?" onClose={() => setDeleting(null)}>
           <p>
             “{deleting.title}” will be deleted together with{' '}
-            <strong>{plural(deleting.progress.total_tasks, 'task')}</strong> and{' '}
-            <strong>{plural(deleting.progress.routine_count, 'routine')}</strong> under it. This
-            cannot be undone.
+            <strong>{plural(deleting.progress.total_tasks, 'task')}</strong> under it. This cannot be
+            undone.
           </p>
           <div className="row">
             <button type="button" className="danger solid" onClick={() => void handleDelete(deleting)}>
@@ -150,7 +149,6 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: GoalRead; onEdit: () => vo
             Next due: {progress.next_due_task.title}, {formatDay(progress.next_due_task.due_date)}
           </li>
         )}
-        {progress.routine_count > 0 && <li>{plural(progress.routine_count, 'routine')}</li>}
         {health.quiet && <li className="loss strong">{health.quiet}</li>}
       </ul>
     </li>

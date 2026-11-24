@@ -3,10 +3,9 @@ import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { Field, FieldGroup } from '@/components/Field'
-import { GoalPicker } from '@/components/GoalPicker'
 import { Modal } from '@/components/Modal'
 import { TimeLimitField } from '@/components/TimeLimitField'
-import { describeSchedule, fromMinutes, loadGoals, timeLimitLabel, type TimeUnit, toMinutes } from '@/data'
+import { describeSchedule, fromMinutes, timeLimitLabel, type TimeUnit, toMinutes } from '@/data'
 import { addDays, formatDay, todayIso, WEEKDAYS } from '@/dates'
 import { useResource } from '@/useResource'
 
@@ -34,8 +33,8 @@ export function RoutinesScreen() {
           Routines
         </h1>
         <p className="muted lede">
-          Routines repeat on a schedule and are ticked off on Today. They are never postponed and
-          never take a Top 3 slot.
+          Everyday chores that repeat on a schedule, ticked off on Today. They stand alone: no goal,
+          no steps, never postponed and never in the Top 3.
         </p>
       </div>
 
@@ -120,16 +119,14 @@ interface RoutineFormProps {
   onCancel?: () => void
 }
 
-/** Create or edit a routine: what, how often, between which dates, toward which goal. */
+/** Create or edit a routine: what, how often, between which dates, how long each time. */
 function RoutineForm({ routine, submitLabel, onSaved, onCancel }: RoutineFormProps) {
-  const goals = useResource(loadGoals)
   const [title, setTitle] = useState(routine?.title ?? '')
   const [frequency, setFrequency] = useState<RoutineFrequency>(routine?.frequency ?? 'daily')
   const [weekdays, setWeekdays] = useState<number[]>(routine?.weekdays ?? [])
   const [dayOfMonth, setDayOfMonth] = useState(String(routine?.day_of_month ?? 1))
   const [startDate, setStartDate] = useState(routine?.start_date ?? todayIso())
   const [endDate, setEndDate] = useState(routine?.end_date ?? addDays(todayIso(), 90))
-  const [goalId, setGoalId] = useState(routine?.goal_id ?? '')
   const initialLimit = fromMinutes(routine?.time_limit_minutes ?? null)
   const [limitAmount, setLimitAmount] = useState(initialLimit.amount)
   const [limitUnit, setLimitUnit] = useState<TimeUnit>(initialLimit.unit)
@@ -148,7 +145,6 @@ function RoutineForm({ routine, submitLabel, onSaved, onCancel }: RoutineFormPro
       day_of_month: frequency === 'monthly' ? Number(dayOfMonth) : null,
       start_date: startDate,
       end_date: endDate,
-      goal_id: goalId || null,
       time_limit_minutes: toMinutes(limitAmount, limitUnit),
     }
     const { error: apiError } = routine
@@ -220,13 +216,6 @@ function RoutineForm({ routine, submitLabel, onSaved, onCancel }: RoutineFormPro
           onAmountChange={setLimitAmount}
           onUnitChange={setLimitUnit}
           info="Optional. The most time to spend each time the routine is due."
-        />
-        <GoalPicker
-          goals={goals.data ?? []}
-          value={goalId}
-          onChange={setGoalId}
-          onGoalCreated={() => void goals.reload()}
-          info="The goal this routine supports. Its count shows on the goal's card."
         />
       </div>
       {frequency === 'weekly' && (

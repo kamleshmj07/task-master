@@ -28,7 +28,6 @@ export function makeTask(overrides: Partial<TaskRead> = {}): TaskRead {
 export function makeRoutine(overrides: Partial<RoutineRead> = {}): RoutineRead {
   return {
     id: 'r1',
-    goal_id: null,
     title: 'Workout',
     time_limit_minutes: null,
     frequency: 'daily',
@@ -55,7 +54,6 @@ export function makeGoal(overrides: Partial<GoalRead> = {}): GoalRead {
     progress: {
       total_tasks: 0,
       done_tasks: 0,
-      routine_count: 0,
       next_due_task: null,
       last_moved_at: '2026-11-20T00:00:00Z',
     },

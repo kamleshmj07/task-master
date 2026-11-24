@@ -22,6 +22,12 @@ beforeEach(() => {
 })
 
 describe('RoutinesScreen', () => {
+  it('has no goal field', async () => {
+    render(<RoutinesScreen />)
+
+    expect(await screen.findByRole('form', { name: 'New routine' })).not.toHaveTextContent('Goal')
+  })
+
   it('describes each routine without dot-joined text', async () => {
     render(<RoutinesScreen />)
 

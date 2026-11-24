@@ -23,7 +23,6 @@ const MARATHON = makeGoal({
   progress: {
     total_tasks: 7,
     done_tasks: 4,
-    routine_count: 2,
     next_due_task: { id: 't1', title: '15 km long run', due_date: addDays(TODAY, 3) },
     last_moved_at: `${addDays(TODAY, -40)}T09:00:00Z`,
   },
@@ -52,11 +51,16 @@ describe('GoalsScreen progress', () => {
     expect(within(await card()).getByText(/5 days left/)).toHaveClass('loss')
   })
 
-  it('names the next task due and counts routines', async () => {
+  it('names the next task due', async () => {
     render(<GoalsScreen />)
 
     expect(within(await card()).getByText(/Next due: 15 km long run/)).toBeInTheDocument()
-    expect(within(await card()).getByText('2 routines')).toBeInTheDocument()
+  })
+
+  it('says nothing about routines, which stand alone', async () => {
+    render(<GoalsScreen />)
+
+    expect(within(await card()).queryByText(/routine/)).not.toBeInTheDocument()
   })
 
   it('says when an active goal has been quiet for 30 days or more', async () => {
@@ -115,7 +119,7 @@ describe('GoalsScreen deleting', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Delete this goal?' })
     expect(dialog).toHaveTextContent('7 tasks')
-    expect(dialog).toHaveTextContent('2 routines')
+    expect(dialog).not.toHaveTextContent('routine')
     expect(mockApi.DELETE).not.toHaveBeenCalled()
   })
 
