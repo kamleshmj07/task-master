@@ -104,8 +104,15 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   (29th to 31st fall back to the month's last day), between a required start
   and end date. Ticked per day with a streak; never postponed; never in the
   Top 3.
-- **Top 3**: ranked one-off tasks for a day (today or later), shown beside
-  the day's routines (`/plans/{date}`).
+- **Today** (landing page, redesigned 2026-11-24; mockup on the "Task
+  Master – Today" canvas): a greeting by name, the day at a glance, the day's
+  three with only the first open task lit (next step in amber, its steps open
+  to tick), routines with streaks, and Heads-up. `/plans/{date}` also returns
+  `suggestions` while a slot is free (left from yesterday, overdue, due that
+  day, next task of the quietest goals; at most 6) and, for today only,
+  `heads_up` (overdue, every step done, due within 3 days; at most 5;
+  nothing already in the three) (`day_guide.py`). Unfinished tasks are
+  suggested the next morning, never carried over automatically.
 - **Notifications** (`alerts.py`), created when the app opens
   (`POST /notifications/check`, safe to repeat; each event has a unique
   `key`):
@@ -125,6 +132,8 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   minutes). Password reset and email verification are not built (no email
   provider yet). Changing the email or password needs `current_password`;
   Settings has a Change password form (signs out everywhere afterwards).
+  Password re-checks (email or password change, account deletion) pause for
+  24 hours after 5 wrong passwords in a row (`auth/reauth.py`).
 - **Security hardening** (`security.py`, details in `docs/security.md`):
   security headers on every response (HSTS in production), API-wide rate
   limits per session or IP (reads and writes separately), JSON security logs
@@ -188,13 +197,14 @@ artifact (artboard "Tasks page – Desk lamp direction").
   page polish, Tips page, notifications) at `bcce44a`, both merged after CI
   passed. The old feature branches are deleted.
 - PR #3 (Phase 1) merged at `b9b938a`; its branch is kept for now (user
-  will clean up later). Active branch: **`feature/security-hardening`**. Before
+  will clean up later). PR #4 (security hardening) merged at `f6e62ba`.
+  Active branch: **`feature/today-redesign`**. Before
   any other new work, suggest a branch and wait for the user's OK. Each
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `ca3d3959383b` (head).
-- Tests: 487 backend (98% coverage), 177 web, 3 api-client, all passing.
+- Dev database migrated to `7b06cb22594e` (head).
+- Tests: 507 backend (98% coverage), 187 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
