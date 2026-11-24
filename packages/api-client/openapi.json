@@ -2550,6 +2550,60 @@
           }
         ]
       }
+    },
+    "/onboarding": {
+      "get": {
+        "tags": [
+          "onboarding"
+        ],
+        "summary": "Handle Get Onboarding",
+        "description": "Which setup steps are done, with what each one made.",
+        "operationId": "handle_get_onboarding_onboarding_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/onboarding/finish": {
+      "post": {
+        "tags": [
+          "onboarding"
+        ],
+        "summary": "Handle Finish Onboarding",
+        "description": "Mark setup as finished, so the card never shows again.",
+        "operationId": "handle_finish_onboarding_onboarding_finish_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3108,6 +3162,130 @@
         ],
         "title": "NotificationRead",
         "description": "Something worth a look: a goal update or tasks coming due."
+      },
+      "OnboardingGoal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "OnboardingGoal",
+        "description": "The goal that lit setup step 1."
+      },
+      "OnboardingRead": {
+        "properties": {
+          "goal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingGoal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingTask"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "three": {
+            "type": "boolean",
+            "title": "Three"
+          },
+          "routine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingRoutine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished": {
+            "type": "boolean",
+            "title": "Finished"
+          }
+        },
+        "type": "object",
+        "required": [
+          "goal",
+          "task",
+          "three",
+          "routine",
+          "finished"
+        ],
+        "title": "OnboardingRead",
+        "description": "First-run setup: each step is done once its field is set (or true)."
+      },
+      "OnboardingRoutine": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "OnboardingRoutine",
+        "description": "The routine that lit setup step 4."
+      },
+      "OnboardingTask": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "first_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Step"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "first_step"
+        ],
+        "title": "OnboardingTask",
+        "description": "The task that lit setup step 2, with its first step."
       },
       "PlanItem": {
         "properties": {

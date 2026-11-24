@@ -688,6 +688,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Get Onboarding
+         * @description Which setup steps are done, with what each one made.
+         */
+        get: operations["handle_get_onboarding_onboarding_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/onboarding/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Finish Onboarding
+         * @description Mark setup as finished, so the card never shows again.
+         */
+        post: operations["handle_finish_onboarding_onboarding_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -936,6 +976,60 @@ export interface components {
             created_at: string;
             /** Read */
             read: boolean;
+        };
+        /**
+         * OnboardingGoal
+         * @description The goal that lit setup step 1.
+         */
+        OnboardingGoal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * OnboardingRead
+         * @description First-run setup: each step is done once its field is set (or true).
+         */
+        OnboardingRead: {
+            goal: components["schemas"]["OnboardingGoal"] | null;
+            task: components["schemas"]["OnboardingTask"] | null;
+            /** Three */
+            three: boolean;
+            routine: components["schemas"]["OnboardingRoutine"] | null;
+            /** Finished */
+            finished: boolean;
+        };
+        /**
+         * OnboardingRoutine
+         * @description The routine that lit setup step 4.
+         */
+        OnboardingRoutine: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * OnboardingTask
+         * @description The task that lit setup step 2, with its first step.
+         */
+        OnboardingTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** First Step */
+            first_step: string | null;
         };
         /**
          * PlanItem
@@ -3050,6 +3144,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnreadCount"];
+                };
+            };
+        };
+    };
+    handle_get_onboarding_onboarding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRead"];
+                };
+            };
+        };
+    };
+    handle_finish_onboarding_onboarding_finish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRead"];
                 };
             };
         };

@@ -122,6 +122,8 @@ class User(TimestampMixin, Base):
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     # Asked for on first sign-in; NULL until the user has told us.
     display_name: Mapped[str | None] = mapped_column(String(100))
+    # When first-run setup was finished; NULL while it still shows.
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Wrong passwords given to re-check it (changing email or password,
     # deleting the account), and how long such checks are refused once too
     # many were wrong. Login has its own throttle (`auth/lockout.py`).
