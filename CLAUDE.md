@@ -60,10 +60,10 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
 
 ## Domain rules (decided with the user)
 
-- **Goals** are optional on tasks and routines. Every goal response carries
-  `progress` (tasks done of total, routine count, next task due, last moved);
+- **Goals** are optional on tasks; routines never have one. Every goal
+  response carries `progress` (tasks done of total, next task due, last moved);
   the web shows days to the deadline and "quiet for N days" (30+) from it.
-  Deleting a goal deletes its tasks and routines, always behind an in-app
+  Deleting a goal deletes its tasks (never routines), always behind an in-app
   confirmation that says how many. Every new user gets an
   ordinary, deletable **"Essentials"** goal (`defaults.py`).
 - **Tasks** have an ordered list of **steps** (at least 1, at most 50). The
@@ -90,7 +90,7 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   full history only when asked ("Show postponement history").
 - A finished task's steps are read-only: no adding, removing, reordering or
   ticking. Top 3 tasks on Today expand to the same step checklist. Moving a date earlier is a plain edit and is not logged.
-- **Routines** are independent chores without steps (decided: no steps). They
+- **Routines** are independent chores: no goal, no steps (decided). They
   have an optional time limit (each time due), and repeat
   daily, weekly on chosen weekdays, or monthly on a day
   (29th to 31st fall back to the month's last day), between a required start
@@ -169,8 +169,8 @@ artifact (artboard "Tasks page – Desk lamp direction").
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `30bcd4c2b5e5` (head).
-- Tests: 404 backend (98% coverage), 116 web, 3 api-client, all passing.
+- Dev database migrated to `1bfc16acd627` (head).
+- Tests: 423 backend (98% coverage), 167 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
@@ -178,7 +178,9 @@ artifact (artboard "Tasks page – Desk lamp direction").
    history) is built on `feature/edit-goals-tasks-routines`; merge it via PR.
 2. Redesign Today, mockup first (still has old layout and copy).
 3. Redesign Goals (progress per goal) and Routines (streaks, week view).
-4. Show a task's postponement history (the API records it).
+4. Repeating tasks (proposed, not decided): recurring goal work such as
+   "Run 20 min daily" for a marathon goal; one run exists at a time, with
+   steps, time limit, postpone or skip with a reason, counted in progress.
 5. Deployment: app container, production config, HTTPS; schedule the
    clean-up job; Redis for login throttling and uvicorn's trusted proxy.
 6. Email provider for password reset and verification.
