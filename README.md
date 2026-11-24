@@ -4,30 +4,48 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 
 ## What it does
 
+- **Today** is the landing page. It greets you by name, shows the day at a
+  glance, and holds the day's **three** tasks: only the first unfinished one
+  is lit, with its next step in amber and its steps ready to tick. Free slots
+  come with **suggestions** (what was left from yesterday, overdue tasks,
+  tasks due that day, the next task of a quiet goal), and **Heads-up** lists
+  what needs a decision. The day's routines sit beside them.
 - **Goals** are outcomes worth working toward, each with a "why" and its
-  progress: tasks done, days to the deadline, the next task due. Every
-  account starts with an **Essentials** goal for everyday responsibilities;
-  tasks can also have no goal.
+  progress: tasks done, days to the deadline, the next task due, and how long
+  it has been quiet. Every account starts with an **Essentials** goal for
+  everyday responsibilities; tasks can also have no goal.
 - **Tasks** are broken into ordered **steps**. The first unfinished step is
   the task's next action, so every task starts with something concrete. A
   task may carry an optional **time limit**: the total time you allow for it.
+  A task can **repeat** (daily, on chosen weekdays, or monthly): only the
+  next run is open, and finishing or skipping it brings up the one after.
 - Tasks are shown in four views: **Scheduled**, **Review** (overdue, or every
-  step done but not yet completed), **Someday** (no date) and **Done** (kept
-  for 90 days).
+  step done but not yet completed), **Someday** (no date) and **Done**.
+  Finished tasks are kept while their goal is active.
 - **Postponing** is the core of the app. Moving a task later (or to Someday)
   asks why: *stuck*, *dreading*, *blocked* or *other*. Each reason gets a fix
   aimed at that root cause, and every postponement is counted. A plain edit
   cannot quietly push a date back.
-- **Routines** repeat daily, weekly on chosen days, or monthly on a day of
-  the month, between a start and an end date, with an optional time limit. They are ticked off per day
-  and show a streak, but are never postponed.
 - After postponing, a **tip** pops up with the fix for that reason and a link
   to its guide on the **Tips** page, which explains each reason with
   before-and-after examples.
-- New users are asked for their name and timezone on first sign-in; the
-  account, with everything in it, can be deleted from Settings.
-- **Today** shows the day's ranked **Top 3** tasks and, separately, its
-  routines.
+- **Routines** are everyday chores with no goal and no steps. They repeat
+  daily, weekly on chosen days, or monthly on a day of the month, between a
+  start and an end date, with an optional time limit. They are ticked off per
+  day and show a streak, but are never postponed.
+- **Notifications** flag goals with a deadline within a week, goals with
+  every task done, goals quiet for 30 days, and tasks due in the next three
+  days.
+- New users are asked for their name, then **"Light the lamp"** walks them
+  through four steps on Today (a goal, a task with a tiny first step, today's
+  three, a routine), each lighting one ray of a desk lamp. Pages with nothing
+  in them yet say what they are for and offer one way to start.
+- **Settings** has the profile, Change password, and deleting the account
+  with everything in it. Password fields can show what was typed.
+- On phones the navigation moves to a bottom tab bar and pop-ups slide up
+  from the bottom.
+- Security measures, what the production host must add, and known
+  shortcomings are in [docs/security.md](docs/security.md).
 
 ## Structure
 
@@ -91,10 +109,9 @@ npm run generate:api
 
 ## Branches
 
-`master` is the stable line. Work happens on a feature branch and reaches
-`master` through a pull request, which is where CI runs. The first round of
-work was merged in PR #1; from here on there is one branch per page or
-feature (e.g. `feature/tasks-page`, `feature/today-page`).
+`master` is the stable line. Work happens on one feature branch per page or
+feature (e.g. `feature/onboarding`) and reaches `master` through a pull
+request, merged once CI passes. PRs #1 to #7 are merged.
 
 ## CI
 

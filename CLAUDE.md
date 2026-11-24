@@ -205,7 +205,7 @@ artifact (artboard "Tasks page – Desk lamp direction").
 - Web: shared helpers go in `data.ts` / `dates.ts`, not component files
   (fast-refresh lint). Tests mock `@/api` with `vi.mock(..., await import(...))`.
 
-## Status (2026-11-23)
+## Status (2026-11-24, end of session)
 
 - `master` has everything so far: PR #1 (MVP) at `1b21d97` and PR #2 (Tasks
   page polish, Tips page, notifications) at `bcce44a`, both merged after CI
@@ -213,9 +213,11 @@ artifact (artboard "Tasks page – Desk lamp direction").
 - PR #3 (Phase 1) merged at `b9b938a`; its branch is kept for now (user
   will clean up later). PR #4 (security hardening) merged at `f6e62ba`.
   PR #5 (Today redesign) merged at `f5528de`, PR #6 (onboarding, show
-  password) at `0a21dfa`. Active branch: **`feature/phone-layout`**. Before
-  any other new work, suggest a branch and wait for the user's OK. Each
-  branch reaches `master` through a PR.
+  password) at `0a21dfa`, PR #7 (phone layout) at `e3df4ea`. No active
+  branch: the checkout is on `master`. Merged feature branches are kept on
+  purpose (the user will clean them up). Before any new work, suggest a
+  branch and wait for the user's OK. Each branch reaches `master` through a
+  PR, merged once CI passes.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
 - Dev database migrated to `674ce9fdd30a` (head).
@@ -223,15 +225,15 @@ artifact (artboard "Tasks page – Desk lamp direction").
 
 ## Next steps (ask the user which first)
 
-1. Phone layout on `feature/phone-layout`: check on a real phone, merge via PR.
-2. Deployment: app container, production config, HTTPS, the web headers in
-   `docs/security.md`; schedule the clean-up job; backups; monitoring.
-3. Email provider for password reset and verification (also fixes sign-up
+1. Deployment (start here): pick a host first (a short comparison was
+   offered), then: app container, production config, HTTPS, the web headers
+   in `docs/security.md`; schedule the clean-up job; backups; monitoring.
+2. Email provider for password reset and verification (also fixes sign-up
    revealing taken emails).
-4. Parked security findings, to decide together before launch (also in
+3. Parked security findings, to decide together before launch (also in
    memory): the 24-hour password re-check pause can trap an intruder in;
    the single API process and zero-downtime deploys.
-5. End-to-end browser tests (Playwright).
-6. Later: a fuller Goals and Routines layout pass; the mobile app (shares
+4. End-to-end browser tests (Playwright).
+5. Later: a fuller Goals and Routines layout pass; the mobile app (shares
    `packages/api-client`); premium features (postponement insights, weekly
    review, LLM review).
