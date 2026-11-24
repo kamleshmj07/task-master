@@ -2,6 +2,7 @@ import type {
   DueRoutine,
   GoalRead,
   HeadsUpItem,
+  OnboardingRead,
   PlanRead,
   PlanSuggestion,
   PostponeResponse,
@@ -11,10 +12,12 @@ import { useCallback, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { useAuth } from '@/authContext'
+import { LightTheLamp } from '@/components/LightTheLamp'
 import { Modal } from '@/components/Modal'
 import { describeRepeat, loadGoals, plural, timeLimitLabel } from '@/data'
 import { addDays, dueLabel, formatDay, todayIso } from '@/dates'
 import { useNavigation } from '@/navigation'
+import { hideFor, isHiddenFor } from '@/onboarding'
 import { EditTaskDialog } from '@/screens/EditTaskDialog'
 import { NewTaskPanel } from '@/screens/NewTaskPanel'
 import { PostponeDialog, TipDialog } from '@/screens/PostponeForm'
@@ -27,9 +30,15 @@ import {
   SLOT_LABELS,
   stepsDone,
   suggestionReason,
+  welcome,
 } from '@/today'
 import { PAGE_SIZE } from '@/usePagedTasks'
 import { useResource } from '@/useResource'
+
+async function loadOnboarding(): Promise<OnboardingRead | null> {
+  const { data } = await api.GET('/onboarding')
+  return data ?? null
+}
 
 async function loadPlan(day: string): Promise<PlanRead | null> {
   const { data } = await api.GET('/plans/{plan_date}', {
@@ -63,6 +72,9 @@ export function TodayScreen() {
   const [openedAt] = useState(() => new Date())
   const plan = useResource(useCallback(() => loadPlan(day), [day]))
   const goals = useResource(loadGoals)
+  const onboarding = useResource(loadOnboarding)
+  const [lampHidden, setLampHidden] = useState(() => isHiddenFor(today))
+  const { go } = useNavigation()
   const [error, setError] = useState<string | null>(null)
   const [postponing, setPostponing] = useState<TaskRead | null>(null)
   const [tip, setTip] = useState<PostponeResponse | null>(null)
@@ -94,6 +106,14 @@ export function TodayScreen() {
     await plan.reload()
   }
 
+  const setupOpen = onboarding.data !== null && !onboarding.data.finished
+  const showLamp = setupOpen && isToday && !lampHidden
+
+  async function handleFinishSetup() {
+    await api.POST('/onboarding/finish')
+    await onboarding.reload()
+  }
+
   const routines = plan.data?.routines ?? []
   const doneTasks = topThree.filter((item) => item.task.status === 'done').length
   const doneRoutines = routines.filter((due) => due.done).length
@@ -102,7 +122,7 @@ export function TodayScreen() {
     <section className="today stack-lg" aria-labelledby="today-heading">
       <header className="today-head">
         <div className="stack-sm">
-          <h1 id="today-heading">{isToday ? greeting(openedAt, user?.display_name) : longDay(day)}</h1>
+          <h1 id="today-heading">{isToday ? (setupOpen ? welcome(user?.display_name) : greeting(openedAt, user?.display_name)) : longDay(day)}</h1>
           <div className="row today-day">
             <button type="button" className="icon-button" aria-label="Previous day" onClick={() => setDay(addDays(day, -1))}>
               <Chevron direction="left" />
@@ -128,6 +148,21 @@ export function TodayScreen() {
         <p role="alert" className="error">
           {error}
         </p>
+      )}
+
+      {showLamp && onboarding.data && (
+        <LightTheLamp
+          state={onboarding.data}
+          name={user?.display_name}
+          onChanged={() => void Promise.all([onboarding.reload(), plan.reload(), goals.reload()])}
+          onAddToThree={(taskId) => void savePlan([...ids, taskId]).then(() => onboarding.reload())}
+          onFinish={() => void handleFinishSetup()}
+          onReadTips={() => void handleFinishSetup().then(() => go('tips'))}
+          onHide={() => {
+            hideFor(today)
+            setLampHidden(true)
+          }}
+        />
       )}
 
       <div className="today-columns">

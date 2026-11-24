@@ -83,6 +83,22 @@ describe('GoalsScreen progress', () => {
   })
 })
 
+describe('GoalsScreen with only Essentials', () => {
+  it('asks what the user is working toward', async () => {
+    mockApi.GET.mockReturnValue(ok([makeGoal({ id: 'e', title: 'Essentials' })]))
+    render(<GoalsScreen />)
+
+    expect(await screen.findByRole('heading', { name: 'What are you working toward?' })).toBeInTheDocument()
+  })
+
+  it('stays quiet once the user has a goal of their own', async () => {
+    render(<GoalsScreen />)
+    await card()
+
+    expect(screen.queryByRole('heading', { name: 'What are you working toward?' })).not.toBeInTheDocument()
+  })
+})
+
 describe('GoalsScreen editing', () => {
   it('opens the goal in an edit dialog with its values', async () => {
     render(<GoalsScreen />)

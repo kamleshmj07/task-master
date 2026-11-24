@@ -2,11 +2,13 @@ import type { RoutineCreate, RoutineFrequency, RoutineRead } from '@task-master/
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { EmptyState } from '@/components/EmptyState'
 import { Field, FieldGroup } from '@/components/Field'
 import { Modal } from '@/components/Modal'
 import { TimeLimitField } from '@/components/TimeLimitField'
 import { describeSchedule, fromMinutes, timeLimitLabel, type TimeUnit, toMinutes } from '@/data'
 import { addDays, formatDay, todayIso, WEEKDAYS } from '@/dates'
+import { focusFormUnder } from '@/emptyStates'
 import { useResource } from '@/useResource'
 
 async function loadRoutines(): Promise<RoutineRead[]> {
@@ -44,10 +46,15 @@ export function RoutinesScreen() {
       </section>
 
       {routines.data?.length === 0 && (
-        <div className="panel empty">
-          <p className="title">No routines yet</p>
-          <p className="muted">Add one above, then tick it off each day on Today.</p>
-        </div>
+        <EmptyState
+          icon="routines"
+          title="No routines yet"
+          actionLabel="New routine"
+          onAction={() => focusFormUnder('new-routine-heading')}
+        >
+          The small things you do on a schedule: a walk, vitamins, watering the plants. Every tick grows a
+          streak.
+        </EmptyState>
       )}
       {routines.data && routines.data.length > 0 && (
         <ul className="panel plain-list">
