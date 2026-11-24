@@ -90,6 +90,14 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   full history only when asked ("Show postponement history").
 - A finished task's steps are read-only: no adding, removing, reordering or
   ticking. Top 3 tasks on Today expand to the same step checklist. Moving a date earlier is a plain edit and is not logged.
+- **Repeating tasks** (`repeats.py`) are recurring goal work ("Run 20 min
+  every day"): a task with a `repeat` rule (daily, weekly on chosen days, or
+  monthly; optional `until`). Only one run is open at a time. Finishing a run
+  creates the next, with fresh steps, on the first due day after it that is
+  not in the past (missed runs are not owed). Runs share `series_id`; done
+  runs count in goal progress. A run cannot go to Someday; instead
+  `POST /tasks/{id}/skip` moves it to the next due day, with a reason, and
+  counts as a postponement.
 - **Routines** are independent chores: no goal, no steps (decided). They
   have an optional time limit (each time due), and repeat
   daily, weekly on chosen weekdays, or monthly on a day
@@ -169,22 +177,19 @@ artifact (artboard "Tasks page – Desk lamp direction").
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `1bfc16acd627` (head).
-- Tests: 423 backend (98% coverage), 167 web, 3 api-client, all passing.
+- Dev database migrated to `ca3d3959383b` (head).
+- Tests: 450 backend (98% coverage), 173 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
 1. Phase 1 (editing tasks, goals and routines; goal progress; postponement
-   history) is built on `feature/edit-goals-tasks-routines`; merge it via PR.
+   history; repeating tasks) is built on `feature/edit-goals-tasks-routines`; merge it via PR.
 2. Redesign Today, mockup first (still has old layout and copy).
 3. Redesign Goals (progress per goal) and Routines (streaks, week view).
-4. Repeating tasks (proposed, not decided): recurring goal work such as
-   "Run 20 min daily" for a marathon goal; one run exists at a time, with
-   steps, time limit, postpone or skip with a reason, counted in progress.
-5. Deployment: app container, production config, HTTPS; schedule the
+4. Deployment: app container, production config, HTTPS; schedule the
    clean-up job; Redis for login throttling and uvicorn's trusted proxy.
-6. Email provider for password reset and verification.
-7. End-to-end browser tests (Playwright).
-8. Mobile UI (shares `packages/api-client`; own screens).
-9. Decide whether the default Essentials goal should be left out of the
+5. Email provider for password reset and verification.
+6. End-to-end browser tests (Playwright).
+7. Mobile UI (shares `packages/api-client`; own screens).
+8. Decide whether the default Essentials goal should be left out of the
    "hasn't moved in 30 days" notification.
