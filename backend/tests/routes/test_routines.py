@@ -79,26 +79,25 @@ class TestCreateRoutine:
 
         assert response.status_code == 422
 
-    async def test_rejects_other_users_goal(
-        self, api_client: AsyncClient, auth_headers: Headers, other_headers: Headers
+    async def test_stands_alone_without_a_goal(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        routine = await create_routine(api_client, auth_headers)
+
+        assert "goal_id" not in routine
+
+    async def test_survives_deleting_any_goal(
+        self, api_client: AsyncClient, auth_headers: Headers
     ) -> None:
         goal = await api_client.post(
-            "/goals", json={"title": "Theirs"}, headers=other_headers
+            "/goals", json={"title": "Run a marathon"}, headers=auth_headers
         )
+        routine = await create_routine(api_client, auth_headers)
 
-        response = await api_client.post(
-            "/routines",
-            json={
-                "title": "Workout",
-                "frequency": "daily",
-                "start_date": "2026-01-01",
-                "end_date": "2026-12-31",
-                "goal_id": goal.json()["id"],
-            },
-            headers=auth_headers,
-        )
+        await api_client.delete(f"/goals/{goal.json()['id']}", headers=auth_headers)
 
-        assert response.status_code == 404
+        kept = await api_client.get(f"/routines/{routine['id']}", headers=auth_headers)
+        assert kept.status_code == 200
 
     async def test_requires_authentication(self, api_client: AsyncClient) -> None:
         response = await api_client.post("/routines", json={})
@@ -356,3 +355,49 @@ class TestGetAndDelete:
         )
 
         assert response.status_code == 404
+
+
+class TestTimeLimit:
+    async def test_is_optional(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        routine = await create_routine(api_client, auth_headers)
+
+        assert routine["time_limit_minutes"] is None
+
+    async def test_can_be_set_and_changed(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        routine = await create_routine(api_client, auth_headers, time_limit_minutes=30)
+
+        response = await api_client.patch(
+            f"/routines/{routine['id']}",
+            json={"time_limit_minutes": 45},
+            headers=auth_headers,
+        )
+
+        assert (
+            routine["time_limit_minutes"],
+            response.json()["time_limit_minutes"],
+        ) == (
+            30,
+            45,
+        )
+
+    @pytest.mark.parametrize("minutes", [0, 1441])
+    async def test_rejects_out_of_range(
+        self, api_client: AsyncClient, auth_headers: Headers, minutes: int
+    ) -> None:
+        response = await api_client.post(
+            "/routines",
+            json={
+                "title": "Workout",
+                "frequency": "daily",
+                "start_date": "2026-01-01",
+                "end_date": "2026-12-31",
+                "time_limit_minutes": minutes,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422

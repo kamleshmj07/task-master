@@ -1,4 +1,4 @@
-import type { RoutineRead, TaskRead } from '@task-master/api-client'
+import type { GoalRead, RoutineRead, TaskRead } from '@task-master/api-client'
 
 /** A to-do task with two unfinished steps, unless overridden. */
 export function makeTask(overrides: Partial<TaskRead> = {}): TaskRead {
@@ -14,6 +14,9 @@ export function makeTask(overrides: Partial<TaskRead> = {}): TaskRead {
     due_date: null,
     status: 'todo',
     postpone_count: 0,
+    postponement_reasons: {},
+    repeat: null,
+    series_id: null,
     completed_at: null,
     created_at: '2026-11-22T00:00:00Z',
     updated_at: '2026-11-22T00:00:00Z',
@@ -27,8 +30,8 @@ export function makeTask(overrides: Partial<TaskRead> = {}): TaskRead {
 export function makeRoutine(overrides: Partial<RoutineRead> = {}): RoutineRead {
   return {
     id: 'r1',
-    goal_id: null,
     title: 'Workout',
+    time_limit_minutes: null,
     frequency: 'daily',
     weekdays: null,
     day_of_month: null,
@@ -36,6 +39,26 @@ export function makeRoutine(overrides: Partial<RoutineRead> = {}): RoutineRead {
     end_date: '2026-12-31',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+/** An active goal with no tasks yet, unless overridden. */
+export function makeGoal(overrides: Partial<GoalRead> = {}): GoalRead {
+  return {
+    id: 'g1',
+    title: 'Essentials',
+    why: null,
+    deadline: null,
+    status: 'active',
+    created_at: '2026-11-01T00:00:00Z',
+    updated_at: '2026-11-20T00:00:00Z',
+    progress: {
+      total_tasks: 0,
+      done_tasks: 0,
+      next_due_task: null,
+      last_moved_at: '2026-11-20T00:00:00Z',
+    },
     ...overrides,
   }
 }

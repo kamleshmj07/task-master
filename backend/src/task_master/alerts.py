@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.dependencies import local_today
+from task_master.goal_progress import last_moved, with_last_moved
 from task_master.models import (
     Goal,
     GoalStatus,
@@ -26,7 +27,6 @@ from task_master.models import (
     NotificationKind,
     Task,
     TaskStatus,
-    TaskStep,
     User,
 )
 
@@ -138,18 +138,12 @@ async def goal_stale_alerts(
     A goal "moves" when it is edited, or one of its tasks is added, edited or
     finished, or one of their steps is ticked.
     """
-    last_moved = func.greatest(
-        Goal.updated_at,
-        func.max(Task.updated_at),
-        func.max(TaskStep.done_at),
-    )
+    moved = last_moved()
     rows = await session.execute(
-        select(Goal.id, Goal.title, last_moved)
-        .outerjoin(Task, Task.goal_id == Goal.id)
-        .outerjoin(TaskStep, TaskStep.task_id == Task.id)
+        with_last_moved(select(Goal.id, Goal.title, moved))
         .where(Goal.user_id == user_id, Goal.status == GoalStatus.ACTIVE)
         .group_by(Goal.id, Goal.title, Goal.updated_at)
-        .having(last_moved < now - timedelta(days=STALE_GOAL_DAYS))
+        .having(moved < now - timedelta(days=STALE_GOAL_DAYS))
     )
     return [
         Alert(

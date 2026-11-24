@@ -214,7 +214,7 @@ export interface paths {
         };
         /**
          * Handle List Goals
-         * @description List goals, oldest first, optionally filtered by status.
+         * @description List goals with their progress, oldest first, optionally by status.
          */
         get: operations["handle_list_goals_goals_get"];
         put?: never;
@@ -238,7 +238,7 @@ export interface paths {
         };
         /**
          * Handle Get Goal
-         * @description Return one goal.
+         * @description Return one goal with its progress.
          */
         get: operations["handle_get_goal_goals__goal_id__get"];
         put?: never;
@@ -330,6 +330,8 @@ export interface paths {
         /**
          * Handle Update Task
          * @description Change a task; moving it requires owning the destination goal.
+         *
+         *     Finishing a run of a repeating task adds the series' next run.
          */
         patch: operations["handle_update_task_tasks__task_id__patch"];
         trace?: never;
@@ -412,6 +414,28 @@ export interface paths {
          * @description Move an open task later or to Someday; get a fix for the reason given.
          */
         post: operations["handle_postpone_task_tasks__task_id__postpone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handle Skip Run
+         * @description Skip a repeating task's run: it moves to the next due day.
+         *
+         *     A skip asks why, like any postponement, and counts as one.
+         */
+        post: operations["handle_skip_run_tasks__task_id__skip_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -771,8 +795,24 @@ export interface components {
             deadline?: string | null;
         };
         /**
+         * GoalProgress
+         * @description How far a goal has come, and whether it is moving.
+         */
+        GoalProgress: {
+            /** Total Tasks */
+            total_tasks: number;
+            /** Done Tasks */
+            done_tasks: number;
+            next_due_task: components["schemas"]["NextDueTask"] | null;
+            /**
+             * Last Moved At
+             * Format: date-time
+             */
+            last_moved_at: string;
+        };
+        /**
          * GoalRead
-         * @description A goal as returned by the API.
+         * @description A goal as returned by the API, with its progress.
          */
         GoalRead: {
             /**
@@ -797,6 +837,7 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            progress: components["schemas"]["GoalProgress"];
         };
         /**
          * GoalStatus
@@ -832,6 +873,24 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * NextDueTask
+         * @description The soonest-due open task under a goal.
+         */
+        NextDueTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
         };
         /**
          * NotificationKind
@@ -980,8 +1039,8 @@ export interface components {
             end_date: string;
             /** Title */
             title: string;
-            /** Goal Id */
-            goal_id?: string | null;
+            /** Time Limit Minutes */
+            time_limit_minutes?: number | null;
         };
         /**
          * RoutineFrequency
@@ -999,10 +1058,10 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Goal Id */
-            goal_id: string | null;
             /** Title */
             title: string;
+            /** Time Limit Minutes */
+            time_limit_minutes: number | null;
             frequency: components["schemas"]["RoutineFrequency"];
             /** Weekdays */
             weekdays: number[] | null;
@@ -1036,8 +1095,8 @@ export interface components {
         RoutineUpdate: {
             /** Title */
             title?: string | null;
-            /** Goal Id */
-            goal_id?: string | null;
+            /** Time Limit Minutes */
+            time_limit_minutes?: number | null;
             frequency?: components["schemas"]["RoutineFrequency"] | null;
             /** Weekdays */
             weekdays?: number[] | null;
@@ -1047,6 +1106,15 @@ export interface components {
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
+        };
+        /**
+         * SkipRequest
+         * @description Skip a repeating task's run: it moves to the next due day.
+         */
+        SkipRequest: {
+            reason: components["schemas"]["PostponeReason"];
+            /** Note */
+            note?: string | null;
         };
         /**
          * StepCreate
@@ -1119,7 +1187,8 @@ export interface components {
          * TaskCreate
          * @description New task: its steps, in order, starting with a concrete first one.
          *
-         *     Leaving out `due_date` puts the task in Someday.
+         *     Leaving out `due_date` puts the task in Someday. A repeating task needs a
+         *     `due_date`: the day of its first run.
          */
         TaskCreate: {
             /** Goal Id */
@@ -1132,6 +1201,7 @@ export interface components {
             time_limit_minutes?: number | null;
             /** Due Date */
             due_date?: string | null;
+            repeat?: components["schemas"]["TaskRepeat"] | null;
         };
         /**
          * TaskRead
@@ -1158,6 +1228,13 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             /** Postpone Count */
             postpone_count: number;
+            /** Postponement Reasons */
+            postponement_reasons: {
+                [key: string]: number;
+            };
+            repeat: components["schemas"]["TaskRepeat"] | null;
+            /** Series Id */
+            series_id: string | null;
             /** Completed At */
             completed_at: string | null;
             /**
@@ -1175,6 +1252,22 @@ export interface components {
              * @description Text of the first step not yet done, if any.
              */
             readonly next_step: string | null;
+        };
+        /**
+         * TaskRepeat
+         * @description How a task repeats. Weekdays: 0 = Monday ... 6 = Sunday.
+         *
+         *     `until` is the last day a run may fall on; leave it out to repeat for
+         *     good.
+         */
+        TaskRepeat: {
+            frequency: components["schemas"]["RoutineFrequency"];
+            /** Weekdays */
+            weekdays?: number[] | null;
+            /** Day Of Month */
+            day_of_month?: number | null;
+            /** Until */
+            until?: string | null;
         };
         /**
          * TaskStatus
@@ -1198,6 +1291,7 @@ export interface components {
             /** Due Date */
             due_date?: string | null;
             status?: components["schemas"]["TaskStatus"] | null;
+            repeat?: components["schemas"]["TaskRepeat"] | null;
         };
         /**
          * TaskView
@@ -2382,6 +2476,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PostponeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostponeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_skip_run_tasks__task_id__skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkipRequest"];
             };
         };
         responses: {

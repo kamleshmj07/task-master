@@ -153,6 +153,33 @@ describe('PostponeDialog dates', () => {
   })
 })
 
+describe('PostponeDialog for a repeating task', () => {
+  function renderRepeating() {
+    const task = makeTask({ due_date: TODAY, repeat: { frequency: 'daily', weekdays: null, day_of_month: null, until: null }, series_id: 't1' })
+    render(<PostponeDialog task={task} onPostponed={vi.fn()} onClose={vi.fn()} />)
+  }
+
+  it('offers skipping to the next run instead of Someday', () => {
+    renderRepeating()
+
+    expect(moveTo().getByRole('button', { name: 'Skip to next run' })).toHaveAttribute('aria-pressed', 'true')
+    expect(moveTo().queryByRole('button', { name: 'Someday' })).not.toBeInTheDocument()
+  })
+
+  it('skips the run with the reason given', async () => {
+    mockApi.POST.mockReturnValue(ok({}))
+    renderRepeating()
+
+    await userEvent.click(reasons().getByRole('button', { name: /I don't know where to start/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Postpone' }))
+
+    expect(mockApi.POST).toHaveBeenCalledWith('/tasks/{task_id}/skip', {
+      params: { path: { task_id: 't1' } },
+      body: { reason: 'stuck', note: null },
+    })
+  })
+})
+
 describe('TipDialog', () => {
   function result(reason: 'stuck' | 'blocked'): PostponeResponse {
     return {

@@ -745,7 +745,7 @@
           "goals"
         ],
         "summary": "Handle List Goals",
-        "description": "List goals, oldest first, optionally filtered by status.",
+        "description": "List goals with their progress, oldest first, optionally by status.",
         "operationId": "handle_list_goals_goals_get",
         "security": [
           {
@@ -827,7 +827,7 @@
           "goals"
         ],
         "summary": "Handle Get Goal",
-        "description": "Return one goal.",
+        "description": "Return one goal with its progress.",
         "operationId": "handle_get_goal_goals__goal_id__get",
         "security": [
           {
@@ -1272,7 +1272,7 @@
           "tasks"
         ],
         "summary": "Handle Update Task",
-        "description": "Change a task; moving it requires owning the destination goal.",
+        "description": "Change a task; moving it requires owning the destination goal.\n\nFinishing a run of a repeating task adds the series' next run.",
         "operationId": "handle_update_task_tasks__task_id__patch",
         "security": [
           {
@@ -1640,6 +1640,65 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PostponeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostponeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/skip": {
+      "post": {
+        "tags": [
+          "postponements"
+        ],
+        "summary": "Handle Skip Run",
+        "description": "Skip a repeating task's run: it moves to the next due day.\n\nA skip asks why, like any postponement, and counts as one.",
+        "operationId": "handle_skip_run_tasks__task_id__skip_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkipRequest"
               }
             }
           }
@@ -2740,6 +2799,42 @@
         "title": "GoalCreate",
         "description": "New goal."
       },
+      "GoalProgress": {
+        "properties": {
+          "total_tasks": {
+            "type": "integer",
+            "title": "Total Tasks"
+          },
+          "done_tasks": {
+            "type": "integer",
+            "title": "Done Tasks"
+          },
+          "next_due_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextDueTask"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_moved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Moved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_tasks",
+          "done_tasks",
+          "next_due_task",
+          "last_moved_at"
+        ],
+        "title": "GoalProgress",
+        "description": "How far a goal has come, and whether it is moving."
+      },
       "GoalRead": {
         "properties": {
           "id": {
@@ -2786,6 +2881,9 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/GoalProgress"
           }
         },
         "type": "object",
@@ -2796,10 +2894,11 @@
           "deadline",
           "status",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "progress"
         ],
         "title": "GoalRead",
-        "description": "A goal as returned by the API."
+        "description": "A goal as returned by the API, with its progress."
       },
       "GoalStatus": {
         "type": "string",
@@ -2892,6 +2991,32 @@
         ],
         "title": "HealthResponse",
         "description": "Health check payload."
+      },
+      "NextDueTask": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "due_date"
+        ],
+        "title": "NextDueTask",
+        "description": "The soonest-due open task under a goal."
       },
       "NotificationKind": {
         "type": "string",
@@ -3230,17 +3355,18 @@
             "minLength": 1,
             "title": "Title"
           },
-          "goal_id": {
+          "time_limit_minutes": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Goal Id"
+            "title": "Time Limit Minutes"
           }
         },
         "type": "object",
@@ -3270,21 +3396,20 @@
             "format": "uuid",
             "title": "Id"
           },
-          "goal_id": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "time_limit_minutes": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Goal Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
+            "title": "Time Limit Minutes"
           },
           "frequency": {
             "$ref": "#/components/schemas/RoutineFrequency"
@@ -3338,8 +3463,8 @@
         "type": "object",
         "required": [
           "id",
-          "goal_id",
           "title",
+          "time_limit_minutes",
           "frequency",
           "weekdays",
           "day_of_month",
@@ -3366,17 +3491,18 @@
             ],
             "title": "Title"
           },
-          "goal_id": {
+          "time_limit_minutes": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Goal Id"
+            "title": "Time Limit Minutes"
           },
           "frequency": {
             "anyOf": [
@@ -3445,6 +3571,31 @@
         "type": "object",
         "title": "RoutineUpdate",
         "description": "Partial routine update; schedule fields are checked together."
+      },
+      "SkipRequest": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/PostponeReason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 280
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "SkipRequest",
+        "description": "Skip a repeating task's run: it moves to the next due day."
       },
       "StepCreate": {
         "properties": {
@@ -3656,6 +3807,16 @@
               }
             ],
             "title": "Due Date"
+          },
+          "repeat": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskRepeat"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3664,7 +3825,7 @@
           "steps"
         ],
         "title": "TaskCreate",
-        "description": "New task: its steps, in order, starting with a concrete first one.\n\nLeaving out `due_date` puts the task in Someday."
+        "description": "New task: its steps, in order, starting with a concrete first one.\n\nLeaving out `due_date` puts the task in Someday. A repeating task needs a\n`due_date`: the day of its first run."
       },
       "TaskRead": {
         "properties": {
@@ -3726,6 +3887,38 @@
             "type": "integer",
             "title": "Postpone Count"
           },
+          "postponement_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/PostponeReason"
+            },
+            "type": "object",
+            "title": "Postponement Reasons"
+          },
+          "repeat": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskRepeat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -3772,6 +3965,9 @@
           "due_date",
           "status",
           "postpone_count",
+          "postponement_reasons",
+          "repeat",
+          "series_id",
           "completed_at",
           "created_at",
           "updated_at",
@@ -3779,6 +3975,60 @@
         ],
         "title": "TaskRead",
         "description": "A task as returned by the API, with its steps in order.\n\n`next_step` is the first unfinished step: the task's next action."
+      },
+      "TaskRepeat": {
+        "properties": {
+          "frequency": {
+            "$ref": "#/components/schemas/RoutineFrequency"
+          },
+          "weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer",
+                  "maximum": 6.0,
+                  "minimum": 0.0
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekdays"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 31.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frequency"
+        ],
+        "title": "TaskRepeat",
+        "description": "How a task repeats. Weekdays: 0 = Monday ... 6 = Sunday.\n\n`until` is the last day a run may fall on; leave it out to repeat for\ngood."
       },
       "TaskStatus": {
         "type": "string",
@@ -3845,6 +4095,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/TaskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "repeat": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskRepeat"
               },
               {
                 "type": "null"

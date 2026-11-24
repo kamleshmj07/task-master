@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { todayIso } from '@/dates'
 import { TasksScreen } from '@/screens/TasksScreen'
 import { findA11yViolations } from '@/test/axe'
-import { makeTask } from '@/test/fixtures'
+import { makeGoal, makeTask } from '@/test/fixtures'
 import { mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -14,16 +14,11 @@ vi.mock('@/api', async (importOriginal) => ({
   api: (await import('@/test/mockApi')).mockApi,
 }))
 
-const GOALS: GoalRead[] = [
-  {
-    id: 'g1',
-    title: 'Essentials',
-    why: null,
-    deadline: null,
-    status: 'active',
-    created_at: '',
-    updated_at: '',
-  },
+const GOALS: GoalRead[] = [makeGoal()]
+
+const HISTORY = [
+  { id: 'p1', task_id: 't1', from_date: '2099-01-01', to_date: '2099-01-05', reason: 'blocked', note: 'Waiting on Sam', created_at: '2026-11-10T10:00:00Z' },
+  { id: 'p2', task_id: 't1', from_date: '2099-01-05', to_date: null, reason: 'blocked', note: null, created_at: '2026-11-20T10:00:00Z' },
 ]
 
 const TODAY = todayIso()
@@ -50,6 +45,7 @@ function viewOf(task: TaskRead): View {
 function mockData(tasks: TaskRead[]) {
   mockApi.GET.mockImplementation((path: string, options?: { params?: { query?: Query } }) => {
     if (path === '/goals') return ok(GOALS)
+    if (path === '/tasks/{task_id}/postponements') return ok(HISTORY)
     const query = options?.params?.query ?? {}
     const byGoal = tasks.filter((task) =>
       query.no_goal ? task.goal_id === null : !query.goal_id || task.goal_id === query.goal_id,
@@ -294,6 +290,87 @@ describe('Step order', () => {
   })
 })
 
+describe('Editing and history', () => {
+  const postponed = makeTask({ due_date: TODAY, postpone_count: 3, postponement_reasons: { blocked: 2, dreading: 1 } })
+
+  it('says why a task was postponed', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    expect(await screen.findByText('Postponed 3 times: 2 blocked, 1 dreading')).toBeInTheDocument()
+  })
+
+  it('keeps the history hidden until asked for', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    expect(screen.getByRole('button', { name: 'Show postponement history' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.queryByRole('heading', { name: 'History' })).not.toBeInTheDocument()
+  })
+
+  it('shows the history, newest first, when asked', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show postponement history' }))
+
+    await screen.findByRole('heading', { name: 'History' })
+    const history = Array.from(document.querySelectorAll('.history-entry'))
+    expect(history[0]).toHaveTextContent('Moved to Someday')
+    expect(history[1]).toHaveTextContent('“Waiting on Sam”')
+  })
+
+  it('links to the guide for a reason that keeps coming back', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Show postponement history' }))
+
+    expect(await screen.findByRole('button', { name: "Read: When something's in the way" })).toBeInTheDocument()
+  })
+
+  it('opens the edit dialog', async () => {
+    mockData([postponed])
+    render(<TasksScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit “Renew insurance”' }))
+
+    expect(screen.getByRole('dialog', { name: 'Edit task' })).toBeInTheDocument()
+  })
+})
+
+describe('Repeating tasks', () => {
+  it('say how they repeat', async () => {
+    mockData([makeTask({ title: 'Run 20 min', due_date: TODAY, repeat: { frequency: 'weekly', weekdays: [0, 3], day_of_month: null, until: null } })])
+    render(<TasksScreen />)
+
+    expect(await screen.findByText('Repeats Mon, Thu')).toBeInTheDocument()
+  })
+})
+
+describe('Finished tasks', () => {
+  const finished = makeTask({ status: 'done', steps: [{ id: 's1', text: 'Only', done: true }] })
+
+  it('offer no way to add, remove or reorder steps', async () => {
+    mockData([finished])
+    render(<TasksScreen />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Done/ }))
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps/ }))
+
+    expect(screen.queryByRole('textbox', { name: /Add a step/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Remove step/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Only' })).toBeDisabled()
+  })
+})
+
 describe('New task', () => {
   it('creates a task with its steps, goal and time limit', async () => {
     mockData([])
@@ -318,6 +395,7 @@ describe('New task', () => {
         goal_id: 'g1',
         time_limit_minutes: 90,
         due_date: null,
+        repeat: null,
       },
     })
   })

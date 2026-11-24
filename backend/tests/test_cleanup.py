@@ -3,12 +3,19 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master import cleanup
 from task_master.cleanup import purge_completed_tasks, purge_read_notifications
-from task_master.models import Goal, Notification, NotificationKind, Task, TaskStatus
+from task_master.models import (
+    Goal,
+    GoalStatus,
+    Notification,
+    NotificationKind,
+    Task,
+    TaskStatus,
+)
 from tests.factories import make_goal, make_task, make_user
 
 NOW = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
@@ -25,6 +32,15 @@ async def finished_task(
     return task
 
 
+async def settle(
+    session: AsyncSession, goal: Goal, status: GoalStatus, when: datetime
+) -> None:
+    """Complete or archive `goal`, as if it happened at `when`."""
+    await session.execute(
+        update(Goal).where(Goal.id == goal.id).values(status=status, updated_at=when)
+    )
+
+
 async def remaining_ids(session: AsyncSession) -> set[object]:
     return set(await session.scalars(select(Task.id)))
 
@@ -32,15 +48,47 @@ async def remaining_ids(session: AsyncSession) -> set[object]:
 @pytest.mark.anyio
 @pytest.mark.db
 class TestPurgeCompletedTasks:
-    async def test_deletes_tasks_finished_before_the_cutoff(
+    async def test_deletes_goal_less_tasks_finished_before_the_cutoff(
         self, db_session: AsyncSession
     ) -> None:
         goal = await make_goal(db_session, await make_user(db_session))
-        await finished_task(db_session, goal, CUTOFF - timedelta(days=1))
+        task = await finished_task(db_session, goal, CUTOFF - timedelta(days=1))
+        task.goal_id = None
+        await db_session.flush()
 
         deleted = await purge_completed_tasks(db_session, CUTOFF)
 
         assert (deleted, await remaining_ids(db_session)) == (1, set())
+
+    async def test_keeps_finished_tasks_of_active_goals(
+        self, db_session: AsyncSession
+    ) -> None:
+        goal = await make_goal(db_session, await make_user(db_session))
+        task = await finished_task(db_session, goal, CUTOFF - timedelta(days=30))
+
+        await purge_completed_tasks(db_session, CUTOFF)
+
+        assert await remaining_ids(db_session) == {task.id}
+
+    async def test_deletes_them_once_the_goal_settled_long_ago(
+        self, db_session: AsyncSession
+    ) -> None:
+        goal = await make_goal(db_session, await make_user(db_session))
+        await finished_task(db_session, goal, CUTOFF - timedelta(days=30))
+        await settle(db_session, goal, GoalStatus.COMPLETED, CUTOFF - timedelta(days=1))
+
+        assert await purge_completed_tasks(db_session, CUTOFF) == 1
+
+    async def test_waits_after_the_goal_was_just_archived(
+        self, db_session: AsyncSession
+    ) -> None:
+        goal = await make_goal(db_session, await make_user(db_session))
+        task = await finished_task(db_session, goal, CUTOFF - timedelta(days=30))
+        await settle(db_session, goal, GoalStatus.ARCHIVED, NOW)
+
+        await purge_completed_tasks(db_session, CUTOFF)
+
+        assert await remaining_ids(db_session) == {task.id}
 
     async def test_keeps_recently_finished_tasks(
         self, db_session: AsyncSession

@@ -4,7 +4,8 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 
 ## What it does
 
-- **Goals** are outcomes worth working toward, each with a "why". Every
+- **Goals** are outcomes worth working toward, each with a "why" and its
+  progress: tasks done, days to the deadline, the next task due. Every
   account starts with an **Essentials** goal for everyday responsibilities;
   tasks can also have no goal.
 - **Tasks** are broken into ordered **steps**. The first unfinished step is
@@ -18,7 +19,7 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
   aimed at that root cause, and every postponement is counted. A plain edit
   cannot quietly push a date back.
 - **Routines** repeat daily, weekly on chosen days, or monthly on a day of
-  the month, between a start and an end date. They are ticked off per day
+  the month, between a start and an end date, with an optional time limit. They are ticked off per day
   and show a streak, but are never postponed.
 - After postponing, a **tip** pops up with the fix for that reason and a link
   to its guide on the **Tips** page, which explains each reason with

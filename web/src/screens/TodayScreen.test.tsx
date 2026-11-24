@@ -92,6 +92,49 @@ describe('TodayScreen', () => {
     expect(mockApi.PUT.mock.calls[0]?.[1].body).toEqual({ task_ids: ['a', 'b'] })
   })
 
+  it('ticks steps of a Top 3 task without leaving Today', async () => {
+    mockGets(plan())
+    mockApi.PATCH.mockReturnValue(
+      ok(
+        makeTask({
+          id: 'a',
+          title: 'Draft proposal',
+          steps: [
+            { id: 's1', text: 'Find the policy', done: true },
+            { id: 's2', text: 'Call the broker', done: false },
+          ],
+        }),
+      ),
+    )
+    render(<TodayScreen />)
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Show steps for “Draft proposal”, 0 of 2 done/ }),
+    )
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Find the policy' }))
+
+    expect(mockApi.PATCH).toHaveBeenCalledWith('/tasks/{task_id}/steps/{step_id}', {
+      params: { path: { task_id: 'a', step_id: 's1' } },
+      body: { done: true },
+    })
+  })
+
+  it('asks to complete a Top 3 task once every step is ticked', async () => {
+    const single = makeTask({ id: 'a', title: 'Draft proposal', steps: [{ id: 's1', text: 'Only', done: false }] })
+    mockGets(plan({ top_three: [{ rank: 1, task: single }] }))
+    mockApi.PATCH.mockReturnValue(ok({ ...single, steps: [{ id: 's1', text: 'Only', done: true }], next_step: null }))
+    render(<TodayScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Show steps for “Draft proposal”/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Only' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark complete' }))
+
+    expect(mockApi.PATCH).toHaveBeenLastCalledWith('/tasks/{task_id}', {
+      params: { path: { task_id: 'a' } },
+      body: { status: 'done' },
+    })
+  })
+
   it('has no accessibility violations', async () => {
     mockGets(plan())
     const { container } = render(<TodayScreen />)

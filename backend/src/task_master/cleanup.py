@@ -1,7 +1,8 @@
 """Clean-up job: delete tasks finished longer ago than the retention period.
 
 Finished tasks stay visible under Done for `completed_task_retention_days`
-(default 90) and are then deleted with their steps, postponements and plan
+(default 90) and are then deleted (those of active goals are kept until the
+goal is completed or archived) with their steps, postponements and plan
 slots. Read notifications older than that go too. Run it on a schedule, e.g. daily:
 
     uv run python -m task_master.cleanup
@@ -11,19 +12,38 @@ import sys
 from datetime import datetime, timedelta
 
 import anyio
-from sqlalchemy import delete
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.config import get_settings
 from task_master.database import create_engine, create_session_factory
-from task_master.models import Notification, Task, TaskStatus, utc_now
+from task_master.models import (
+    Goal,
+    GoalStatus,
+    Notification,
+    Task,
+    TaskStatus,
+    utc_now,
+)
 
 
 async def purge_completed_tasks(session: AsyncSession, cutoff: datetime) -> int:
-    """Delete every task completed before `cutoff`; return how many went."""
+    """Delete tasks completed before `cutoff`; return how many went.
+
+    A finished task of an active goal is kept, so the goal's progress stays
+    whole. Once the goal is completed or archived, its finished tasks go
+    after the same retention period, counted from when the goal last changed.
+    """
+    settled_goals = select(Goal.id).where(
+        Goal.status != GoalStatus.ACTIVE, Goal.updated_at < cutoff
+    )
     result = await session.execute(
         delete(Task)
-        .where(Task.status == TaskStatus.DONE, Task.completed_at < cutoff)
+        .where(
+            Task.status == TaskStatus.DONE,
+            Task.completed_at < cutoff,
+            or_(Task.goal_id.is_(None), Task.goal_id.in_(settled_goals)),
+        )
         .returning(Task.id)
     )
     deleted = len(result.all())

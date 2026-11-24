@@ -60,7 +60,11 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
 
 ## Domain rules (decided with the user)
 
-- **Goals** are optional on tasks and routines. Every new user gets an
+- **Goals** are optional on tasks; routines never have one. Every goal
+  response carries `progress` (tasks done of total, next task due, last moved);
+  the web shows days to the deadline and "quiet for N days" (30+) from it.
+  Deleting a goal deletes its tasks (never routines), always behind an in-app
+  confirmation that says how many. Every new user gets an
   ordinary, deletable **"Essentials"** goal (`defaults.py`).
 - **Tasks** have an ordered list of **steps** (at least 1, at most 50). The
   first unfinished step is `next_step`. Ticking the last step never completes
@@ -69,8 +73,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   for a task. No timer, no tracking. There is **no daily capacity**.
 - **Views**, decided on the server, each task in exactly one:
   **Review** (open and overdue, or every step done), **Scheduled** (dated,
-  today or later), **Someday** (no date), **Done** (kept 90 days, then the
-  clean-up job deletes it). Lists page 50 at a time; `/tasks/counts` gives
+  today or later), **Someday** (no date), **Done**. Finished tasks are kept
+  while their goal is active; goal-less ones, and those of goals completed or
+  archived more than 90 days ago, are deleted by the clean-up job. Lists page 50 at a time; `/tasks/counts` gives
   real totals.
 - **Postponing** asks for a reason: `stuck`, `dreading`, `blocked`, or
   `other` (which needs a note of up to 280 characters). It moves the date
@@ -80,8 +85,22 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   links to its guide on the **Tips** page; it is not stored anywhere and is
   gone once acknowledged.
   `PATCH /tasks/{id}` refuses to move a date later or clear it, so nothing
-  skips postponement. Moving a date earlier is a plain edit and is not logged.
-- **Routines** repeat daily, weekly on chosen weekdays, or monthly on a day
+  skips postponement. Each task carries `postponement_reasons` (counts per
+  reason); the web shows "Postponed 3 times: 2 blocked, 1 dreading", and the
+  full history only when asked ("Show postponement history").
+- A finished task's steps are read-only: no adding, removing, reordering or
+  ticking. Top 3 tasks on Today expand to the same step checklist. Moving a date earlier is a plain edit and is not logged.
+- **Repeating tasks** (`repeats.py`) are recurring goal work ("Run 20 min
+  every day"): a task with a `repeat` rule (daily, weekly on chosen days, or
+  monthly; optional `until`). Only one run is open at a time. Finishing a run
+  creates the next, with fresh steps, on the first due day after it that is
+  not in the past (missed runs are not owed). Runs share `series_id`; done
+  runs count in goal progress. A run cannot go to Someday; instead
+  `POST /tasks/{id}/skip` moves it to the next due day, with a reason, and
+  counts as a postponement.
+- **Routines** are independent chores: no goal, no steps (decided). They
+  have an optional time limit (each time due), and repeat
+  daily, weekly on chosen weekdays, or monthly on a day
   (29th to 31st fall back to the month's last day), between a required start
   and end date. Ticked per day with a streak; never postponed; never in the
   Top 3.
@@ -153,26 +172,24 @@ artifact (artboard "Tasks page – Desk lamp direction").
 - `master` has everything so far: PR #1 (MVP) at `1b21d97` and PR #2 (Tasks
   page polish, Tips page, notifications) at `bcce44a`, both merged after CI
   passed. The old feature branches are deleted.
-- **No active feature branch.** Before new work, suggest a branch off
-  `master` (e.g. `feature/today-page`) and wait for the user's OK. Each
+- Active branch: **`feature/edit-goals-tasks-routines`** (Phase 1). Before
+  any other new work, suggest a branch and wait for the user's OK. Each
   branch reaches `master` through a PR.
 - PRs are opened without a reviewer for now: the reviewer rule in
   `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `30bcd4c2b5e5` (head).
-- Tests: 404 backend (98% coverage), 116 web, 3 api-client, all passing.
+- Dev database migrated to `ca3d3959383b` (head).
+- Tests: 450 backend (98% coverage), 173 web, 3 api-client, all passing.
 
 ## Next steps (ask the user which first)
 
-1. Editing gaps: tasks cannot be edited (title, goal, time limit, due date)
-   or deleted from the web app; goals can only change status; routines
-   cannot be edited. The API already supports all of it.
+1. Phase 1 (editing tasks, goals and routines; goal progress; postponement
+   history; repeating tasks) is built on `feature/edit-goals-tasks-routines`; merge it via PR.
 2. Redesign Today, mockup first (still has old layout and copy).
 3. Redesign Goals (progress per goal) and Routines (streaks, week view).
-4. Show a task's postponement history (the API records it).
-5. Deployment: app container, production config, HTTPS; schedule the
+4. Deployment: app container, production config, HTTPS; schedule the
    clean-up job; Redis for login throttling and uvicorn's trusted proxy.
-6. Email provider for password reset and verification.
-7. End-to-end browser tests (Playwright).
-8. Mobile UI (shares `packages/api-client`; own screens).
-9. Decide whether the default Essentials goal should be left out of the
+5. Email provider for password reset and verification.
+6. End-to-end browser tests (Playwright).
+7. Mobile UI (shares `packages/api-client`; own screens).
+8. Decide whether the default Essentials goal should be left out of the
    "hasn't moved in 30 days" notification.

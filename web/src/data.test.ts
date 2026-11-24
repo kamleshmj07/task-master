@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { describeSchedule, groupReview, groupScheduled, timeLimitLabel, toMinutes } from '@/data'
+import {
+  describeSchedule,
+  fromMinutes,
+  goalHealth,
+  groupReview,
+  groupScheduled,
+  postponementSummary,
+  timeLimitLabel,
+  toMinutes,
+} from '@/data'
 import { addDays, daysBetween, dueLabel, isoDate, quickDates } from '@/dates'
-import { makeRoutine, makeTask } from '@/test/fixtures'
+import { makeGoal, makeRoutine, makeTask } from '@/test/fixtures'
 
 const TODAY = '2026-11-22'
 
@@ -118,5 +127,63 @@ describe('dates', () => {
 
   it('marks overdue dates', () => {
     expect(dueLabel('2026-11-20', TODAY)).toMatch(/^Overdue since /)
+  })
+})
+
+describe('postponementSummary', () => {
+  it('is empty for a task never postponed', () => {
+    expect(postponementSummary(0, {})).toBe('')
+  })
+
+  it('lists reasons, most frequent first', () => {
+    expect(postponementSummary(3, { dreading: 1, blocked: 2 })).toBe('Postponed 3 times: 2 blocked, 1 dreading')
+  })
+
+  it('uses the singular for one postponement', () => {
+    expect(postponementSummary(1, { stuck: 1 })).toBe('Postponed 1 time: 1 stuck')
+  })
+})
+
+describe('fromMinutes', () => {
+  it.each([
+    [null, { amount: '', unit: 'min' }],
+    [45, { amount: '45', unit: 'min' }],
+    [120, { amount: '2', unit: 'hours' }],
+    [90, { amount: '1.5', unit: 'hours' }],
+    [50, { amount: '50', unit: 'min' }],
+    [70, { amount: '70', unit: 'min' }],
+  ] as const)('splits %j', (minutes, parts) => {
+    expect(fromMinutes(minutes)).toEqual(parts)
+  })
+})
+
+describe('goalHealth', () => {
+  it('counts the days left to a deadline', () => {
+    const health = goalHealth(makeGoal({ deadline: '2026-12-02' }), TODAY)
+
+    expect(health.deadline).toMatch(/^Deadline .+, 10 days left$/)
+    expect(health.deadlineUrgent).toBe(false)
+  })
+
+  it('marks a deadline within a week as urgent', () => {
+    expect(goalHealth(makeGoal({ deadline: '2026-11-25' }), TODAY).deadlineUrgent).toBe(true)
+  })
+
+  it('says when a deadline has passed', () => {
+    expect(goalHealth(makeGoal({ deadline: '2026-11-20' }), TODAY).deadline).toMatch(/^Deadline passed on /)
+  })
+
+  it('flags a goal quiet for 30 days', () => {
+    const goal = makeGoal()
+    goal.progress = { ...goal.progress, last_moved_at: '2026-10-20T10:00:00Z' }
+
+    expect(goalHealth(goal, TODAY).quiet).toBe('Quiet for 33 days')
+  })
+
+  it('never flags goals that are not active', () => {
+    const goal = makeGoal({ status: 'archived' })
+    goal.progress = { ...goal.progress, last_moved_at: '2026-01-01T00:00:00Z' }
+
+    expect(goalHealth(goal, TODAY).quiet).toBeNull()
   })
 })
