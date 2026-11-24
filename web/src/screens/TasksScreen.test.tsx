@@ -346,6 +346,15 @@ describe('Editing and history', () => {
   })
 })
 
+describe('Repeating tasks', () => {
+  it('say how they repeat', async () => {
+    mockData([makeTask({ title: 'Run 20 min', due_date: TODAY, repeat: { frequency: 'weekly', weekdays: [0, 3], day_of_month: null, until: null } })])
+    render(<TasksScreen />)
+
+    expect(await screen.findByText('Repeats Mon, Thu')).toBeInTheDocument()
+  })
+})
+
 describe('Finished tasks', () => {
   const finished = makeTask({ status: 'done', steps: [{ id: 's1', text: 'Only', done: true }] })
 
@@ -386,6 +395,7 @@ describe('New task', () => {
         goal_id: 'g1',
         time_limit_minutes: 90,
         due_date: null,
+        repeat: null,
       },
     })
   })

@@ -5,8 +5,9 @@ import { api, errorMessage } from '@/api'
 import { Field, FieldGroup } from '@/components/Field'
 import { GoalPicker } from '@/components/GoalPicker'
 import { CloseIcon } from '@/components/Modal'
+import { RepeatField } from '@/components/RepeatField'
 import { TimeLimitField } from '@/components/TimeLimitField'
-import { type TimeUnit, toMinutes } from '@/data'
+import { repeatDraft, type RepeatDraft, repeatFromDraft, type TimeUnit, toMinutes } from '@/data'
 
 interface NewTaskPanelProps {
   goals: GoalRead[]
@@ -23,6 +24,7 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
   const [limitAmount, setLimitAmount] = useState('')
   const [limitUnit, setLimitUnit] = useState<TimeUnit>('min')
   const [dueDate, setDueDate] = useState('')
+  const [repeat, setRepeat] = useState<RepeatDraft>(repeatDraft(null))
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent) {
@@ -34,6 +36,7 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
         goal_id: goalId || null,
         time_limit_minutes: toMinutes(limitAmount, limitUnit),
         due_date: dueDate || null,
+        repeat: repeatFromDraft(repeat),
       },
     })
     if (apiError) {
@@ -116,10 +119,22 @@ export function NewTaskPanel({ goals, onGoalCreated, onCreated, onClose }: NewTa
           onAmountChange={setLimitAmount}
           onUnitChange={setLimitUnit}
         />
-        <Field label="Due date" info="Leave it empty to keep the task in Someday. Moving a date later is a postponement, so it asks why.">
-          {(id) => <input id={id} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />}
+        <Field
+          label="Due date"
+          info="Leave it empty to keep the task in Someday. Moving a date later is a postponement, so it asks why. A repeating task needs one: the day of its first run."
+        >
+          {(id) => (
+            <input
+              id={id}
+              type="date"
+              required={repeat.frequency !== 'none'}
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          )}
         </Field>
       </div>
+      <RepeatField draft={repeat} dueDate={dueDate} onChange={setRepeat} />
 
       {error && (
         <p role="alert" className="error">

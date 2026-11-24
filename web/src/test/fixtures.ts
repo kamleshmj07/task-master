@@ -15,6 +15,8 @@ export function makeTask(overrides: Partial<TaskRead> = {}): TaskRead {
     status: 'todo',
     postpone_count: 0,
     postponement_reasons: {},
+    repeat: null,
+    series_id: null,
     completed_at: null,
     created_at: '2026-11-22T00:00:00Z',
     updated_at: '2026-11-22T00:00:00Z',

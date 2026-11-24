@@ -96,6 +96,39 @@ describe('EditTaskDialog', () => {
     expect(mockApi.DELETE).not.toHaveBeenCalled()
   })
 
+  it('makes a task repeat on chosen weekdays', async () => {
+    renderDialog()
+
+    await userEvent.selectOptions(screen.getByLabelText('Repeats'), 'Weekly, on chosen days')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Fri' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    // 2099-01-10 is a Saturday, picked by default; Friday is added.
+    expect(mockApi.PATCH.mock.calls[0]?.[1].body.repeat).toEqual({
+      frequency: 'weekly',
+      weekdays: [4, 5],
+      day_of_month: null,
+      until: null,
+    })
+  })
+
+  it('leaves the repeat rule out when it did not change', async () => {
+    renderDialog()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApi.PATCH.mock.calls[0]?.[1].body).not.toHaveProperty('repeat')
+  })
+
+  it('can stop a task repeating', async () => {
+    renderDialog(makeTask({ ...TASK, repeat: { frequency: 'daily', weekdays: null, day_of_month: null, until: null } }))
+
+    await userEvent.selectOptions(screen.getByLabelText('Repeats'), "Doesn't repeat")
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApi.PATCH.mock.calls[0]?.[1].body.repeat).toBeNull()
+  })
+
   it('can create a new goal on the spot', async () => {
     mockApi.POST.mockReturnValue(ok(makeGoal({ id: 'g9', title: 'Car' })))
     renderDialog()

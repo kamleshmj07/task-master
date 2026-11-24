@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { InfoTip } from '@/components/InfoTip'
-import { postponementSummary, REASONS, timeLimitLabel } from '@/data'
+import { describeRepeat, postponementSummary, REASONS, timeLimitLabel } from '@/data'
 import { daysBetween, dueLabel, formatDay } from '@/dates'
 import { tipArticle } from '@/tips'
 import { useNavigation } from '@/navigation'
@@ -68,6 +68,7 @@ export function TaskCard({
               {finished} of {task.steps.length} {task.steps.length === 1 ? 'step' : 'steps'}
             </span>
             {limit && <span>{limit} limit</span>}
+            {task.repeat && <span>{describeRepeat(task.repeat)}</span>}
             {goalTitle && <span>{goalTitle}</span>}
             {task.postpone_count > 0 && (
               <span className="loss strong">

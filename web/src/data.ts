@@ -1,8 +1,10 @@
 import type {
   GoalRead,
   PostponeReason,
+  RoutineFrequency,
   RoutineRead,
   TaskRead,
+  TaskRepeat,
 } from '@task-master/api-client'
 
 import { api } from '@/api'
@@ -52,7 +54,7 @@ export async function loadGoals(): Promise<GoalRead[]> {
 }
 
 /** Human summary of a routine's schedule, e.g. "Mon, Wed, Fri". */
-export function describeSchedule(routine: RoutineRead): string {
+export function describeSchedule(routine: Pick<RoutineRead, 'frequency' | 'weekdays' | 'day_of_month'>): string {
   switch (routine.frequency) {
     case 'daily':
       return 'Every day'
@@ -61,6 +63,52 @@ export function describeSchedule(routine: RoutineRead): string {
     case 'monthly':
       return `Monthly on day ${routine.day_of_month ?? '?'} (or the last day)`
   }
+}
+
+/** "Repeats every day" or "Repeats Mon, Thu, until 1 Mar 2027". */
+export function describeRepeat(repeat: TaskRepeat): string {
+  const when =
+    repeat.frequency === 'daily'
+      ? 'every day'
+      : repeat.frequency === 'weekly'
+        ? (repeat.weekdays ?? []).map((day) => WEEKDAYS[day]).join(', ')
+        : `monthly on day ${repeat.day_of_month ?? '?'}`
+  return `Repeats ${when}${repeat.until ? `, until ${formatDay(repeat.until)}` : ''}`
+}
+
+export type RepeatChoice = 'none' | RoutineFrequency
+
+/** The repeat fields of a task form, as the user is editing them. */
+export interface RepeatDraft {
+  frequency: RepeatChoice
+  weekdays: number[]
+  dayOfMonth: string
+  until: string
+}
+
+export function repeatDraft(repeat: TaskRepeat | null | undefined): RepeatDraft {
+  return {
+    frequency: repeat?.frequency ?? 'none',
+    weekdays: repeat?.weekdays ?? [],
+    dayOfMonth: repeat?.day_of_month ? String(repeat.day_of_month) : '',
+    until: repeat?.until ?? '',
+  }
+}
+
+/** The rule to send to the API; null for a task that does not repeat. */
+export function repeatFromDraft(draft: RepeatDraft): TaskRepeat | null {
+  if (draft.frequency === 'none') return null
+  return {
+    frequency: draft.frequency,
+    weekdays: draft.frequency === 'weekly' ? [...draft.weekdays].sort((a, b) => a - b) : null,
+    day_of_month: draft.frequency === 'monthly' ? Number(draft.dayOfMonth) : null,
+    until: draft.until || null,
+  }
+}
+
+/** Weekday of an ISO date, 0 = Monday ... 6 = Sunday, as the API counts. */
+export function weekdayOf(iso: string): number {
+  return (new Date(`${iso}T00:00:00`).getDay() + 6) % 7
 }
 
 /** "45 min" or "1.5 hours"; empty when there is no limit. */

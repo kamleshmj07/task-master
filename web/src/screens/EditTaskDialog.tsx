@@ -5,8 +5,17 @@ import { api, errorMessage } from '@/api'
 import { Field } from '@/components/Field'
 import { GoalPicker } from '@/components/GoalPicker'
 import { Modal } from '@/components/Modal'
+import { RepeatField } from '@/components/RepeatField'
 import { TimeLimitField } from '@/components/TimeLimitField'
-import { fromMinutes, plural, type TimeUnit, toMinutes } from '@/data'
+import {
+  fromMinutes,
+  plural,
+  repeatDraft,
+  type RepeatDraft,
+  repeatFromDraft,
+  type TimeUnit,
+  toMinutes,
+} from '@/data'
 import { formatDay } from '@/dates'
 
 interface EditTaskDialogProps {
@@ -19,8 +28,8 @@ interface EditTaskDialogProps {
 }
 
 /**
- * Edit a task's title, goal, time limit and due date, or delete it. A due
- * date can be brought forward here; moving it later is a postponement.
+ * Edit a task's title, goal, time limit, due date and repeat, or delete it.
+ * A due date can be brought forward here; moving it later is a postponement.
  */
 export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoalCreated }: EditTaskDialogProps) {
   const initialLimit = fromMinutes(task.time_limit_minutes)
@@ -29,6 +38,7 @@ export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoa
   const [limitAmount, setLimitAmount] = useState(initialLimit.amount)
   const [limitUnit, setLimitUnit] = useState<TimeUnit>(initialLimit.unit)
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
+  const [repeat, setRepeat] = useState<RepeatDraft>(repeatDraft(task.repeat))
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +49,8 @@ export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoa
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    const rule = repeatFromDraft(repeat)
+    const ruleChanged = JSON.stringify(rule) !== JSON.stringify(repeatFromDraft(repeatDraft(task.repeat)))
     const { error: apiError } = await api.PATCH('/tasks/{task_id}', {
       params: { path: { task_id: task.id } },
       body: {
@@ -46,6 +58,7 @@ export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoa
         goal_id: goalId || null,
         time_limit_minutes: toMinutes(limitAmount, limitUnit),
         ...(dueDate !== (task.due_date ?? '') ? { due_date: dueDate || null } : {}),
+        ...(ruleChanged ? { repeat: rule } : {}),
       },
     })
     if (apiError) {
@@ -115,7 +128,7 @@ export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoa
               <input
                 id={id}
                 type="date"
-                required={dated}
+                required={dated || repeat.frequency !== 'none'}
                 {...(task.due_date ? { max: task.due_date } : {})}
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
@@ -123,6 +136,7 @@ export function EditTaskDialog({ task, goals, onSaved, onDeleted, onClose, onGoa
             )}
           </Field>
         </div>
+        <RepeatField draft={repeat} dueDate={dueDate} onChange={setRepeat} />
         {error && (
           <p role="alert" className="error">
             {error}

@@ -8,7 +8,7 @@ import { addDays, formatDay, quickDates, todayIso } from '@/dates'
 import { useNavigation } from '@/navigation'
 import { tipArticle } from '@/tips'
 
-type Target = { kind: 'date'; date: string } | { kind: 'pick' } | { kind: 'someday' }
+type Target = { kind: 'date'; date: string } | { kind: 'pick' } | { kind: 'someday' } | { kind: 'skip' }
 
 interface PostponeDialogProps {
   task: TaskRead
@@ -16,21 +16,26 @@ interface PostponeDialogProps {
   onClose: () => void
 }
 
-/** Pop-up asking why a task is being put off, then where it should go. */
+/**
+ * Pop-up asking why a task is being put off, then where it should go. A
+ * repeating task can skip to its next run instead of going to Someday.
+ */
 export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogProps) {
+  const repeating = task.repeat !== null
   const today = todayIso()
   const earliest = latest(today, task.due_date ? addDays(task.due_date, 1) : null)
   const chips = quickDates(today)
   const firstValid = chips.find((chip) => chip.date >= earliest)
   const [reason, setReason] = useState<PostponeReason | null>(null)
   const [target, setTarget] = useState<Target>(
-    firstValid ? { kind: 'date', date: firstValid.date } : { kind: 'pick' },
+    repeating ? { kind: 'skip' } : firstValid ? { kind: 'date', date: firstValid.date } : { kind: 'pick' },
   )
   const [picked, setPicked] = useState(earliest)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const toDate = target.kind === 'someday' ? null : target.kind === 'pick' ? picked : target.date
+  const toDate =
+    target.kind === 'someday' || target.kind === 'skip' ? null : target.kind === 'pick' ? picked : target.date
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -38,10 +43,11 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
       setError('Pick a reason first.')
       return
     }
-    const { data, error: apiError } = await api.POST('/tasks/{task_id}/postpone', {
-      params: { path: { task_id: task.id } },
-      body: { reason, to_date: toDate, note: note || null },
-    })
+    const path = { params: { path: { task_id: task.id } } }
+    const { data, error: apiError } =
+      target.kind === 'skip'
+        ? await api.POST('/tasks/{task_id}/skip', { ...path, body: { reason, note: note || null } })
+        : await api.POST('/tasks/{task_id}/postpone', { ...path, body: { reason, to_date: toDate, note: note || null } })
     if (apiError || !data) {
       setError(errorMessage(apiError))
       return
@@ -105,14 +111,25 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
             >
               Pick a date…
             </button>
-            <button
-              type="button"
-              className="chip"
-              aria-pressed={target.kind === 'someday'}
-              onClick={() => setTarget({ kind: 'someday' })}
-            >
-              Someday
-            </button>
+            {repeating ? (
+              <button
+                type="button"
+                className="chip"
+                aria-pressed={target.kind === 'skip'}
+                onClick={() => setTarget({ kind: 'skip' })}
+              >
+                Skip to next run
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="chip"
+                aria-pressed={target.kind === 'someday'}
+                onClick={() => setTarget({ kind: 'someday' })}
+              >
+                Someday
+              </button>
+            )}
           </div>
           {target.kind === 'pick' && (
             <label>
@@ -121,7 +138,11 @@ export function PostponeDialog({ task, onPostponed, onClose }: PostponeDialogPro
             </label>
           )}
           <p className="muted small" aria-live="polite">
-            {toDate ? `New due date: ${formatDay(toDate)}` : 'It moves to Someday, with no date.'}
+            {target.kind === 'skip'
+              ? 'This run is skipped. It moves to the next day the task repeats.'
+              : toDate
+                ? `New due date: ${formatDay(toDate)}`
+                : 'It moves to Someday, with no date.'}
           </p>
         </div>
 
