@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import delete, select
 
 from task_master.auth.users import CurrentUserDep
+from task_master.day_guide import load_heads_up, load_suggestions
 from task_master.dependencies import NowDep, SessionDep, local_today
 from task_master.models import (
     DailyPlan,
@@ -26,6 +27,7 @@ from task_master.schemas import (
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
+MAX_TOP_THREE = 3
 # Far enough for any real plan; stops one account creating endless rows.
 MAX_PLAN_DAYS_AHEAD = 366
 
@@ -82,7 +84,7 @@ async def handle_set_plan(
 async def _read_plan(
     session: SessionDep, user: User, plan_date: date, today: date
 ) -> PlanRead:
-    """Assemble the Top 3 and the due routines."""
+    """Assemble the Top 3, the due routines, suggestions and heads-up."""
     rows = await session.execute(
         select(DailyPlanItem.rank, Task)
         .join(DailyPlan, DailyPlan.id == DailyPlanItem.plan_id)
@@ -99,7 +101,25 @@ async def _read_plan(
             session, user.id, plan_date, today
         )
     ]
-    return PlanRead(plan_date=plan_date, top_three=top_three, routines=routines)
+    planned = [item.task.id for item in top_three]
+    open_slot = plan_date >= today and len(top_three) < MAX_TOP_THREE
+    suggestions = (
+        await load_suggestions(session, user.id, plan_date, today, planned)
+        if open_slot
+        else []
+    )
+    heads_up = (
+        await load_heads_up(session, user.id, today, planned)
+        if plan_date == today
+        else []
+    )
+    return PlanRead(
+        plan_date=plan_date,
+        top_three=top_three,
+        routines=routines,
+        suggestions=suggestions,
+        heads_up=heads_up,
+    )
 
 
 async def _get_or_create_plan(

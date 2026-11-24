@@ -8,7 +8,11 @@ known shortcomings to revisit.
 - **Accounts.** Passwords are 12 to 128 characters and may not contain the
   email name. Changing the email or password needs the current password, and
   a password change logs the account out everywhere. Deleting the account
-  needs the password too.
+  needs the password too. These re-checks share a guessing limit: after 5
+  wrong passwords in a row they are paused for 24 hours (even the right
+  password is refused), shown as 429 with `Retry-After`. A correct password
+  resets the count, and so will a password reset. The count is stored on the
+  user row, so restarts keep it (`auth/reauth.py`).
 - **Sessions.** Opaque access tokens last 15 minutes. Refresh tokens rotate
   on every use, and reusing an old one revokes its whole family. The web keeps
   the refresh token in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie

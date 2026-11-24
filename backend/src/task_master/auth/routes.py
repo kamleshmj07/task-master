@@ -28,6 +28,11 @@ from fastapi_users.router.common import ErrorCode
 
 from task_master.auth.lockout import LoginThrottle
 from task_master.auth.rate_limit import enforce_auth_rate_limit
+from task_master.auth.reauth import (
+    WrongPasswordError,
+    check_password,
+    wrong_password_reason,
+)
 from task_master.auth.schemas import (
     AccessTokenResponse,
     DeleteAccountRequest,
@@ -48,7 +53,7 @@ from task_master.auth.users import (
 )
 from task_master.config import Settings
 from task_master.dependencies import SessionDep, SettingsDep
-from task_master.models import User
+from task_master.models import User, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -260,14 +265,16 @@ async def handle_delete_account(
     Goals, tasks, steps, postponements, routines, plans, notifications and
     every session go with it; the web refresh cookie is cleared.
     """
-    verified, _ = users.password_helper.verify_and_update(
-        body.password, user.hashed_password
-    )
-    if not verified:
+    try:
+        await check_password(
+            users.session, users.password_helper, user, body.password, utc_now()
+        )
+    except WrongPasswordError as error:
         logger.warning("Account deletion refused: wrong password")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Password is incorrect"
-        )
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=wrong_password_reason(error).replace("Current password", "Password"),
+        ) from error
     await users.delete(user)
     logger.info("Account deleted")
     response.delete_cookie(

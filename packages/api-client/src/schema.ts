@@ -864,6 +864,20 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * HeadsUpItem
+         * @description One task that needs attention, outside the day's three.
+         */
+        HeadsUpItem: {
+            kind: components["schemas"]["HeadsUpKind"];
+            task: components["schemas"]["TaskRead"];
+        };
+        /**
+         * HeadsUpKind
+         * @description Why an open task needs a decision today.
+         * @enum {string}
+         */
+        HeadsUpKind: "overdue" | "ready" | "due_soon";
+        /**
          * HealthResponse
          * @description Health check payload.
          */
@@ -934,7 +948,10 @@ export interface components {
         };
         /**
          * PlanRead
-         * @description A day: its Top 3 tasks and, separately, its routines.
+         * @description A day: its Top 3, its routines, and what helps plan it.
+         *
+         *     `suggestions` are offered while a slot is free on today or a later day.
+         *     `heads_up` is filled for today only.
          */
         PlanRead: {
             /**
@@ -946,6 +963,22 @@ export interface components {
             top_three: components["schemas"]["PlanItem"][];
             /** Routines */
             routines: components["schemas"]["DueRoutine"][];
+            /** Suggestions */
+            suggestions: components["schemas"]["PlanSuggestion"][];
+            /** Heads Up */
+            heads_up: components["schemas"]["HeadsUpItem"][];
+        };
+        /**
+         * PlanSuggestion
+         * @description A task offered for an empty slot, and why.
+         */
+        PlanSuggestion: {
+            kind: components["schemas"]["SuggestionKind"];
+            task: components["schemas"]["TaskRead"];
+            /** Previous Rank */
+            previous_rank?: number | null;
+            /** Goal Title */
+            goal_title?: string | null;
         };
         /**
          * PlanUpdate
@@ -1157,6 +1190,12 @@ export interface components {
             /** Done */
             done?: boolean | null;
         };
+        /**
+         * SuggestionKind
+         * @description Why a task is suggested for the day's three.
+         * @enum {string}
+         */
+        SuggestionKind: "left_over" | "overdue" | "due_today" | "goal_next";
         /**
          * SuggestionRead
          * @description The fix suggested for a postponement.
