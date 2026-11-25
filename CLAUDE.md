@@ -159,51 +159,14 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   before stopping the old one, so the new one may refuse to start. Either the
   host stops the old version first, or the new process waits for the lock.
 
-## Visual design: "Desk lamp" (approved 2026-11-23)
+## Visual design and code conventions
 
-Tokens live at the top of `web/src/index.css`; mockup on the canvas
-artifact (artboard "Tasks page – Desk lamp direction").
-
-- Blue-slate room (`--ink #161a24`, `--slate #1f2533`), warm paper text
-  (`--paper #ece6d9`). One lamp: amber `--lamp #f2b544` marks **only** the
-  next step and keyboard focus. Green = done, red = overdue or lost.
-- Primary buttons are paper-filled with ink text, never amber.
-- One family: Atkinson Hyperlegible Next; tabular figures; sentence case.
-- Corners by role: dialogs 16px, panels 12px, controls 8px, chips pill.
-- Tasks are rows in one panel per group with a status rail (red overdue,
-  green every step done); the next step is the large amber line. Steps form a
-  numbered trail (real sequence). One motion: the new next step glows once.
-- Copy rules: no middle-dot joins, no ALL-CAPS labels, no arrows glued to text.
-- Extra information about a field goes behind an ⓘ button (`InfoTip`), never
-  as grey text under it. Build fields with `Field` / `FieldGroup` so label
-  rows line up in grids.
-- Selected states (`aria-pressed`, `.selected`, `aria-current`) need their
-  own `:hover` rule: the generic `button:hover` outranks them otherwise.
-- Task rows: title with its facts, then the next step as its own block
-  ("Next step" label, amber text, amber left edge).
-- Done for the shell, Tasks, Today and onboarding. Goals and Routines
-  inherit the tokens; a fuller layout pass was deferred (not needed for
-  launch).
-- Phones (up to 720px): the main nav becomes a bottom tab bar with icons,
-  pop-ups become bottom sheets, the notifications panel spans the screen,
-  and rows with actions wrap their buttons under the title.
-
-## Code conventions learned here
-
+- The "Desk lamp" visual design rules live in `web/CLAUDE.md`. Read it
+  before any mockup or UI work, even when no web file is open yet.
+- Backend conventions (time injection, ownership lookups, migrations, the
+  SQL NULL trap) live in `backend/CLAUDE.md`.
 - Line endings are LF (`.gitattributes`). On Windows, write files from
   Python with `encoding="utf-8", newline="\n"`, or cp1252 and CRLF creep in.
-- Inject time through `NowDep` / `get_now`; API tests pin it to
-  2026-11-22 12:00 UTC (`tests/conftest.py`). Use `local_today(tz, now)`
-  for the user's date.
-- Ownership: look rows up with `get_owned_or_404` (other users' rows are
-  404, never 403).
-- Migrations are hand-written when check constraints change (autogenerate
-  misses them); use `op.f()` for names, and copy constants into migrations
-  rather than importing app code. `test_models_match_migrations` guards parity.
-- SQL NULL trap: `NULL < today` is NULL and `~NULL` stays NULL, so guard
-  nullable columns in view conditions.
-- Web: shared helpers go in `data.ts` / `dates.ts`, not component files
-  (fast-refresh lint). Tests mock `@/api` with `vi.mock(..., await import(...))`.
 
 ## Status (2026-11-24, end of session)
 
