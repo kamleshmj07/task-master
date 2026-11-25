@@ -12,9 +12,10 @@ specific to this repo.
 - Never create a branch on your own: suggest one, say what it would be based
   on, and wait for the OK. Branching from unmerged work mixes features into
   one PR, so say so when that would happen.
-- Redesign the UI **page by page, flow by flow**. The Tasks page is done; the
-  others (Today, Routines, Goals, Settings, then mobile) follow and should
-  reuse its pieces (`Modal`, `TaskCard`, the step checklist, chips).
+- Redesign the UI **page by page, flow by flow**. Tasks, Today, onboarding
+  and the "First light" restyle (all pages) are done; a fuller Goals and
+  Routines layout pass and Settings follow, then mobile. Reuse the existing
+  pieces (`Modal`, `TaskCard`, the step checklist, chips, `GoalTag`).
 - Show a **mockup first** for UI redesigns (a Design canvas artifact worked
   well), and agree on open design questions before building.
 - Keep replies short. Ask only for real decisions; recommend an option.
@@ -184,29 +185,33 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
 - Line endings are LF (`.gitattributes`). On Windows, write files from
   Python with `encoding="utf-8", newline="\n"`, or cp1252 and CRLF creep in.
 
-## Status (2026-11-24, end of session)
+## Status (2026-11-25, end of session)
 
-- `master` has everything so far: PR #1 (MVP) at `1b21d97` and PR #2 (Tasks
-  page polish, Tips page, notifications) at `bcce44a`, both merged after CI
-  passed. The old feature branches are deleted.
-- PR #3 (Phase 1) merged at `b9b938a`; its branch is kept for now (user
-  will clean up later). PR #4 (security hardening) merged at `f6e62ba`.
-  PR #5 (Today redesign) merged at `f5528de`, PR #6 (onboarding, show
-  password) at `0a21dfa`, PR #7 (phone layout) at `e3df4ea`. No active
-  branch: the checkout is on `master`. Merged feature branches are kept on
-  purpose (the user will clean them up). Before any new work, suggest a
-  branch and wait for the user's OK. Each branch reaches `master` through a
-  PR, merged once CI passes.
+- `master` at `7f277cf` has everything: PRs #1–#7 as before, #8 ("First
+  light" restyle, goal colours, routine 7-day dots), #9 (rate limits and
+  login throttle shared through Postgres; single-process lock removed), #10
+  (Vercel phase 1: API prefix, pooled database mode, `/health/ready`,
+  `vercel.json`, switchable uptime check). All merged after CI passed.
+- Branches: only `master`, `hosting-readiness` (merged #9, renamed from
+  `feature/shared-rate-limits` at the user's request) and
+  `task-master-vercel` (the Vercel work; continue phases 2+ there). Older
+  feature branches were deleted at the user's request. Before new work on
+  another topic, suggest a branch and wait for the OK. Each branch reaches
+  `master` through a PR, merged once CI passes.
 - PRs are opened without a reviewer for now: the reviewer rule in
-  `C:\dev\.claude\rules\backend.md` is temporarily switched off.
-- Dev database migrated to `674ce9fdd30a` (head).
-- Tests: 517 backend (98% coverage), 210 web, 3 api-client, all passing.
+  `C:\dev\.claude\rules\backend.md` is temporarily switched off. Commit
+  messages and PR bodies never mention the tool used.
+- Dev database migrated to `9c41e07b2d58` (head).
+- Tests: 587 backend (98.5% coverage), 225 web, 3 api-client, all passing.
+- Mockups: "Task Master – First light" canvas
+  https://claude.ai/artifact/DcuuCsDsedKjBc9RX2fhUD (Soft graphite chosen).
 
 ## Next steps (ask the user which first)
 
-1. Deployment (start here): pick a host first (a short comparison was
-   offered), then: app container, production config, HTTPS, the web headers
-   in `docs/security.md`; schedule the clean-up job; backups; monitoring.
+1. Vercel hosting, continue on `task-master-vercel` (roadmap at the top of
+   `docs/hosting-roadmap.md`, guide in `docs/vercel-deployment.md`):
+   phase 2 workflows (migrate then deploy, daily clean-up, nightly backup),
+   then accounts, first deploy, smoke test, turn on the uptime check.
 2. Email provider for password reset and verification (also fixes sign-up
    revealing taken emails).
 3. Parked security findings, to decide together before launch (also in

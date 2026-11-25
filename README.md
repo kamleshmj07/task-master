@@ -13,7 +13,10 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 - **Goals** are outcomes worth working toward, each with a "why" and its
   progress: tasks done, days to the deadline, the next task due, and how long
   it has been quiet. Every account starts with an **Essentials** goal for
-  everyday responsibilities; tasks can also have no goal.
+  everyday responsibilities; tasks can also have no goal. Each goal has a
+  soft **colour** (picked automatically, changeable when editing), shown as a
+  dot next to its tasks and on the goal filter, and as a badge and progress
+  bar on its card.
 - **Tasks** are broken into ordered **steps**. The first unfinished step is
   the task's next action, so every task starts with something concrete. A
   task may carry an optional **time limit**: the total time you allow for it.
@@ -32,7 +35,9 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 - **Routines** are everyday chores with no goal and no steps. They repeat
   daily, weekly on chosen days, or monthly on a day of the month, between a
   start and an end date, with an optional time limit. They are ticked off per
-  day and show a streak, but are never postponed.
+  day and show a streak, but are never postponed. The Routines page lists
+  what is due today, with a large tick, the last seven days as dots, and the
+  streak, above all routines.
 - **Notifications** flag goals with a deadline within a week, goals with
   every task done, goals quiet for 30 days, and tasks due in the next three
   days.
@@ -42,8 +47,10 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
   in them yet say what they are for and offer one way to start.
 - **Settings** has the profile, Change password, and deleting the account
   with everything in it. Password fields can show what was typed.
-- On phones the navigation moves to a bottom tab bar and pop-ups slide up
-  from the bottom.
+- The look is **"First light"**: a soft graphite dark theme with warm text,
+  amber for the next step only, green for done and red for overdue. A
+  finished task glows once. On phones the navigation moves to a bottom tab
+  bar and pop-ups slide up from the bottom.
 - Security measures, what the production host must add, and known
   shortcomings are in [docs/security.md](docs/security.md).
 
@@ -52,10 +59,12 @@ Goal-driven task manager to beat procrastination and achieve goals faster.
 | Path | What | Status |
 | --- | --- | --- |
 | `backend/` | FastAPI API (uv project), see [`backend/README.md`](backend/README.md) | Built |
-| `web/` | React + TypeScript web app (Vite, Vitest) | Built; being redesigned page by page, Tasks page first |
+| `web/` | React + TypeScript web app (Vite, Vitest) | Built ("First light" design); Goals and Routines layout pass deferred |
 | `mobile/` | Expo Android app (React Native, Jest) | Scaffold only: a placeholder screen |
 | `packages/api-client/` | Typed API client shared by web and mobile, generated from the backend's OpenAPI schema | Built |
 | `scripts/` | Database init SQL for Docker | |
+| `docs/` | Security notes, hosting research and roadmap, Vercel guide | |
+| `vercel.json`, `backend/app.py` | Vercel hosting: web and API in one project, API under `/api` | Ready, not deployed yet |
 
 Web and mobile share logic through `packages/*`; each has its own UI.
 
@@ -111,7 +120,9 @@ npm run generate:api
 
 `master` is the stable line. Work happens on one feature branch per page or
 feature (e.g. `feature/onboarding`) and reaches `master` through a pull
-request, merged once CI passes. PRs #1 to #7 are merged.
+request, merged once CI passes. PRs #1 to #10 are merged. Kept branches:
+`hosting-readiness` (merged, PR #9) and `task-master-vercel` (the Vercel
+hosting work, PR #10 merged, phases 2 onward still to do).
 
 ## CI
 
@@ -121,3 +132,22 @@ request, merged once CI passes. PRs #1 to #7 are merged.
   85% coverage floor, and `pip-audit`
 - **frontend**: type check, lint, tests, and `npm audit` (high and critical)
 - **api-contract**: regenerates the API client and fails on any diff
+
+`.github/workflows/uptime.yml` checks the deployed app (`/api/health` every
+15 minutes, `/api/health/ready` daily). It does nothing until the repository
+variables `UPTIME_CHECK=on` and `APP_URL` are set.
+
+## Hosting
+
+Planned on Vercel, starting on a free `vercel.app` address: the web app and
+the API in one project (API under `/api`, so the sign-in cookie works), with
+Neon's free Postgres. In production, rate limits and the login throttle are
+shared through Postgres, so the API can run as many copies as needed.
+
+- Decision, comparison of hosts, and the phased roadmap:
+  [docs/hosting-roadmap.md](docs/hosting-roadmap.md)
+- Step-by-step guide: [docs/vercel-deployment.md](docs/vercel-deployment.md)
+
+Status: phase 1 (code) is done and merged. Next: phase 2 (GitHub workflows to
+migrate then deploy, the daily clean-up, nightly backups), then accounts,
+first deploy and checks.
