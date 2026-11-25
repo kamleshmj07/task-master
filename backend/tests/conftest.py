@@ -10,13 +10,14 @@ from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import make_url
+from sqlalchemy import delete, make_url
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from task_master.config import Settings
-from task_master.database import create_engine
+from task_master.database import create_engine, create_session_factory
 from task_master.dependencies import get_now, get_session
 from task_master.main import create_app
+from task_master.models import RateLimitWindow
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 # API tests run at this moment, so "today" is always 2026-11-22 in UTC.
@@ -142,3 +143,13 @@ async def auth_headers(api_client: AsyncClient) -> dict[str, str]:
 async def other_headers(api_client: AsyncClient) -> dict[str, str]:
     """Bearer headers for a second, unrelated user."""
     return await login_headers(api_client, "stranger@example.com")
+
+
+async def clear_rate_limit_windows(database_url: str) -> None:
+    """Forget the request counts a production-mode app wrote to the database."""
+    engine = create_engine(database_url)
+    try:
+        async with create_session_factory(engine)() as session, session.begin():
+            await session.execute(delete(RateLimitWindow))
+    finally:
+        await engine.dispose()

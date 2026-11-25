@@ -3,7 +3,8 @@
 Finished tasks stay visible under Done for `completed_task_retention_days`
 (default 90) and are then deleted (those of active goals are kept until the
 goal is completed or archived) with their steps, postponements and plan
-slots. Read notifications older than that go too. Run it on a schedule, e.g. daily:
+slots. Read notifications older than that go too, and so do ended
+rate-limit windows. Run it on a schedule, e.g. daily:
 
     uv run python -m task_master.cleanup
 """
@@ -15,6 +16,7 @@ import anyio
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from task_master.auth.rate_limit import purge_expired_windows
 from task_master.config import get_settings
 from task_master.database import create_engine, create_session_factory
 from task_master.models import (
@@ -71,6 +73,7 @@ async def run(now: datetime) -> int:
         async with create_session_factory(engine)() as session:
             cutoff = now - timedelta(days=settings.completed_task_retention_days)
             await purge_read_notifications(session, cutoff)
+            await purge_expired_windows(session, now)
             return await purge_completed_tasks(session, cutoff)
     finally:
         await engine.dispose()

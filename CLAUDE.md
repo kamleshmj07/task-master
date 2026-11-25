@@ -156,13 +156,12 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   `TASK_MASTER_TRUSTED_PROXIES`, no OpenAPI schema in production, and
   production refuses to start without HTTPS CORS origins and a 32+ character
   secret.
-- **Single API process (decided 2026-11-24, a known shortcoming).** Rate
-  limit and throttle counters live in memory, so production holds a Postgres
-  advisory lock and a second process refuses to start (`single_process.py`).
-  Redis would lift this. Open concern, parked by the user until the end of
-  the production-readiness work: zero-downtime deploys start the new version
-  before stopping the old one, so the new one may refuse to start. Either the
-  host stops the old version first, or the new process waits for the lock.
+- **Shared counters (2026-11-25).** In production, API rate limits, the
+  auth rate limit and the login throttle count in Postgres
+  (`auth/rate_limit.py`, `auth/lockout.py`), so any number of API processes
+  share them and zero-downtime deploys work. Development and tests count in
+  memory; tests that build a production app need the test database. The
+  single-process lock is gone. Limits use fixed windows aligned to the clock.
 
 ## Visual design and code conventions
 
@@ -199,8 +198,8 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
 2. Email provider for password reset and verification (also fixes sign-up
    revealing taken emails).
 3. Parked security findings, to decide together before launch (also in
-   memory): the 24-hour password re-check pause can trap an intruder in;
-   the single API process and zero-downtime deploys.
+   memory): the 24-hour password re-check pause can trap an intruder in.
+   Hosting research and options: `docs/hosting-roadmap.md`.
 4. End-to-end browser tests (Playwright).
 5. Later: a fuller Goals and Routines layout pass; the mobile app (shares
    `packages/api-client`); premium features (postponement insights, weekly

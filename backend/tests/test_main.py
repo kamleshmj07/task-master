@@ -2,9 +2,11 @@
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import SecretStr
 
 from task_master.config import Settings
 from task_master.main import create_app
+from tests.conftest import clear_rate_limit_windows
 
 pytestmark = pytest.mark.anyio
 
@@ -33,7 +35,17 @@ class TestDocs:
     async def test_exposes_docs_outside_production(self, settings: Settings) -> None:
         assert await _get(settings, "/docs") == 200
 
-    async def test_hides_docs_in_production(self, settings: Settings) -> None:
-        settings = settings.model_copy(update={"environment": "production"})
+    @pytest.mark.db
+    async def test_hides_docs_in_production(
+        self, settings: Settings, migrated_db: str
+    ) -> None:
+        # Production counts requests in Postgres, so it needs a real database.
+        settings = settings.model_copy(
+            update={"environment": "production", "database_url": SecretStr(migrated_db)}
+        )
+        try:
+            status = await _get(settings, "/docs")
+        finally:
+            await clear_rate_limit_windows(migrated_db)
 
-        assert await _get(settings, "/docs") == 404
+        assert status == 404
