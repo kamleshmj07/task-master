@@ -700,7 +700,7 @@
           "goals"
         ],
         "summary": "Handle Create Goal",
-        "description": "Create a goal.",
+        "description": "Create a goal, with the least-used colour unless one is chosen.",
         "operationId": "handle_create_goal_goals_post",
         "security": [
           {
@@ -2751,6 +2751,17 @@
         ],
         "title": "Body_handle_web_login_auth_web_login_post"
       },
+      "DayMark": {
+        "type": "string",
+        "enum": [
+          "done",
+          "missed",
+          "open",
+          "not_due"
+        ],
+        "title": "DayMark",
+        "description": "How a routine went on one day."
+      },
       "DeleteAccountRequest": {
         "properties": {
           "password": {
@@ -2779,13 +2790,21 @@
           "streak": {
             "type": "integer",
             "title": "Streak"
+          },
+          "recent_days": {
+            "items": {
+              "$ref": "#/components/schemas/DayMark"
+            },
+            "type": "array",
+            "title": "Recent Days"
           }
         },
         "type": "object",
         "required": [
           "routine",
           "done",
-          "streak"
+          "streak",
+          "recent_days"
         ],
         "title": "DueRoutine",
         "description": "A routine due on a given day, with whether it was ticked off."
@@ -2812,6 +2831,19 @@
           "detail"
         ],
         "title": "ErrorModel"
+      },
+      "GoalColor": {
+        "type": "string",
+        "enum": [
+          "sky",
+          "periwinkle",
+          "lilac",
+          "mauve",
+          "steel",
+          "aqua"
+        ],
+        "title": "GoalColor",
+        "description": "A goal's soft accent; the order is the order new goals receive them.\n\nNone of them is green, red or amber, which already mean done, overdue\nand the next step."
       },
       "GoalCreate": {
         "properties": {
@@ -2844,6 +2876,16 @@
               }
             ],
             "title": "Deadline"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2926,6 +2968,9 @@
           "status": {
             "$ref": "#/components/schemas/GoalStatus"
           },
+          "color": {
+            "$ref": "#/components/schemas/GoalColor"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -2947,6 +2992,7 @@
           "why",
           "deadline",
           "status",
+          "color",
           "created_at",
           "updated_at",
           "progress"
@@ -3007,6 +3053,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/GoalStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalColor"
               },
               {
                 "type": "null"

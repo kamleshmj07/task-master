@@ -121,6 +121,24 @@ describe('TasksScreen views', () => {
     expect(screen.getByText('Without goal')).toBeInTheDocument()
   })
 
+  it("names each task's goal in that goal's colour", async () => {
+    mockData([makeTask({ id: 'a', title: 'With goal', goal_id: 'g1', due_date: TODAY })])
+    render(<TasksScreen />)
+
+    const card = (await screen.findByText('With goal')).closest('.task-row') as HTMLElement
+
+    expect(within(card).getByText('Essentials')).toHaveAttribute('data-goal-color', 'sky')
+  })
+
+  it('marks each goal filter with its colour, but not All goals or No goal', async () => {
+    mockData([])
+    render(<TasksScreen />)
+
+    expect(await screen.findByRole('button', { name: 'Essentials' })).toHaveAttribute('data-goal-color', 'sky')
+    expect(screen.getByRole('button', { name: 'All goals' })).not.toHaveAttribute('data-goal-color')
+    expect(screen.getByRole('button', { name: 'No goal' })).not.toHaveAttribute('data-goal-color')
+  })
+
   it('shows the next step on each card, apart from the title', async () => {
     mockData([makeTask({ due_date: TODAY })])
     render(<TasksScreen />)

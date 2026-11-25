@@ -66,6 +66,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   Deleting a goal deletes its tasks (never routines), always behind an in-app
   confirmation that says how many. Every new user gets an
   ordinary, deletable **"Essentials"** goal (`defaults.py`).
+  Each goal has a soft `color` (sky, periwinkle, lilac, mauve, steel, aqua;
+  never green, red or amber). A new goal gets the colour its owner's active
+  goals use least (`goal_colors.py`); it can be changed when editing.
 - **Tasks** have an ordered list of **steps** (at least 1, at most 50). The
   first unfinished step is `next_step`. Ticking the last step never completes
   the task; the UI asks "All steps done. Mark complete?".
@@ -103,7 +106,9 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   daily, weekly on chosen weekdays, or monthly on a day
   (29th to 31st fall back to the month's last day), between a required start
   and end date. Ticked per day with a streak; never postponed; never in the
-  Top 3.
+  Top 3. Due routines also carry `recent_days`, the 7 days up to that day
+  (done, missed, open, not due), shown as dots on the Routines page, which
+  lists what is due today above all routines.
 - **Today** (landing page, redesigned 2026-11-24; mockup on the "Task
   Master – Today" canvas): a greeting by name, the day at a glance, the day's
   three with only the first open task lit (next step in amber, its steps open

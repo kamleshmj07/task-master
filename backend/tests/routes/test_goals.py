@@ -66,6 +66,7 @@ class TestCreateGoal:
             "why",
             "deadline",
             "status",
+            "color",
             "created_at",
             "updated_at",
             "progress",
@@ -180,6 +181,74 @@ class TestGetGoal:
         self, api_client: AsyncClient, auth_headers: Headers
     ) -> None:
         response = await api_client.get("/goals/not-a-uuid", headers=auth_headers)
+
+        assert response.status_code == 422
+
+
+class TestGoalColors:
+    async def test_essentials_starts_with_the_first_colour(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goals = (await api_client.get("/goals", headers=auth_headers)).json()
+
+        assert goals[0]["color"] == "sky"
+
+    async def test_new_goals_get_the_least_used_colour(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        first = await create_goal(api_client, auth_headers)
+        second = await create_goal(api_client, auth_headers)
+
+        assert (first["color"], second["color"]) == ("periwinkle", "lilac")
+
+    async def test_finished_goals_free_their_colour(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        first = await create_goal(api_client, auth_headers)
+        await api_client.patch(
+            f"/goals/{first['id']}", json={"status": "completed"}, headers=auth_headers
+        )
+
+        second = await create_goal(api_client, auth_headers)
+
+        assert second["color"] == "periwinkle"
+
+    async def test_keeps_a_chosen_colour(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers, color="aqua")
+
+        assert goal["color"] == "aqua"
+
+    async def test_changes_colour(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+
+        response = await api_client.patch(
+            f"/goals/{goal['id']}", json={"color": "mauve"}, headers=auth_headers
+        )
+
+        assert response.json()["color"] == "mauve"
+
+    @pytest.mark.parametrize("color", ["green", "", None])
+    async def test_rejects_invalid_colour_on_update(
+        self, api_client: AsyncClient, auth_headers: Headers, color: str | None
+    ) -> None:
+        goal = await create_goal(api_client, auth_headers)
+
+        response = await api_client.patch(
+            f"/goals/{goal['id']}", json={"color": color}, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+
+    async def test_rejects_unknown_colour_on_create(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        response = await api_client.post(
+            "/goals", json={**GOAL, "color": "red"}, headers=auth_headers
+        )
 
         assert response.status_code == 422
 

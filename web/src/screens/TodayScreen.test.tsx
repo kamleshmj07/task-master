@@ -7,7 +7,7 @@ import { type Auth, AuthContext } from '@/authContext'
 import { addDays, todayIso } from '@/dates'
 import { TodayScreen } from '@/screens/TodayScreen'
 import { findA11yViolations } from '@/test/axe'
-import { makeGoal, makeRoutine, makeTask } from '@/test/fixtures'
+import { makeDueRoutine, makeGoal, makeTask } from '@/test/fixtures'
 import { mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -48,7 +48,7 @@ function plan(overrides: Partial<PlanRead> = {}): PlanRead {
       { rank: 1, task: FOCUS },
       { rank: 2, task: SECOND },
     ],
-    routines: [{ done: false, streak: 4, routine: makeRoutine() }],
+    routines: [makeDueRoutine({ streak: 4 })],
     suggestions: [],
     heads_up: [],
     ...overrides,
@@ -154,6 +154,15 @@ describe('Your three', () => {
       params: { path: { task_id: 'a' } },
       body: { status: 'done' },
     })
+  })
+
+  it("names a task's goal in that goal's colour", async () => {
+    mockGets(plan({ top_three: [{ rank: 1, task: { ...FOCUS, goal_id: 'g1' } }] }))
+    renderToday()
+
+    const list = await three()
+
+    expect(list.getByText('Car')).toHaveAttribute('data-goal-color', 'sky')
   })
 
   it('moves the lamp on once the first task is done', async () => {

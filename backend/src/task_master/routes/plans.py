@@ -96,8 +96,13 @@ async def _read_plan(
         PlanItem(rank=rank, task=TaskRead.model_validate(task)) for rank, task in rows
     ]
     routines = [
-        DueRoutine(routine=RoutineRead.model_validate(r), done=done, streak=streak)
-        for r, done, streak in await load_due_routines(
+        DueRoutine(
+            routine=RoutineRead.model_validate(r),
+            done=done,
+            streak=streak,
+            recent_days=recent,
+        )
+        for r, done, streak, recent in await load_due_routines(
             session, user.id, plan_date, today
         )
     ]

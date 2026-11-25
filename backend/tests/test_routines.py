@@ -6,7 +6,13 @@ import pytest
 from pydantic import ValidationError
 
 from task_master.models import RoutineFrequency
-from task_master.routines import Schedule, current_streak, is_due
+from task_master.routines import (
+    DayMark,
+    Schedule,
+    current_streak,
+    is_due,
+    recent_marks,
+)
 from task_master.schemas import RoutineCreate
 
 START = date(2026, 1, 1)
@@ -113,6 +119,50 @@ class TestCurrentStreak:
 
     def test_is_zero_without_ticks(self) -> None:
         assert current_streak(DAILY, set(), date(2026, 3, 10)) == 0
+
+
+class TestRecentMarks:
+    def test_covers_seven_days_oldest_first(self) -> None:
+        today = date(2026, 3, 10)
+        done = {today - timedelta(6), today}
+
+        marks = recent_marks(DAILY, done, today, today)
+
+        assert marks == [DONE, *[MISSED] * 5, DONE]
+
+    def test_unticked_today_is_still_open(self) -> None:
+        today = date(2026, 3, 10)
+
+        assert recent_marks(DAILY, set(), today, today)[-1] == DayMark.OPEN
+
+    def test_marks_days_the_routine_is_not_due(self) -> None:
+        friday = date(2026, 11, 20)
+        done = {date(2026, 11, 16), date(2026, 11, 18)}  # Mon, Wed
+
+        marks = recent_marks(MON_WED_FRI, done, friday, friday)
+
+        # Sat 14 to Fri 20.
+        assert marks == [NOT_DUE, NOT_DUE, DONE, NOT_DUE, DONE, NOT_DUE, OPEN]
+
+    def test_days_before_the_start_are_not_due(self) -> None:
+        marks = recent_marks(DAILY, set(), START + timedelta(1), START + timedelta(1))
+
+        assert marks[:5] == [NOT_DUE] * 5
+
+    def test_future_days_are_open(self) -> None:
+        today = date(2026, 3, 10)
+
+        marks = recent_marks(DAILY, set(), today + timedelta(3), today)
+
+        assert marks[-4:] == [OPEN] * 4
+
+
+DONE, MISSED, OPEN, NOT_DUE = (
+    DayMark.DONE,
+    DayMark.MISSED,
+    DayMark.OPEN,
+    DayMark.NOT_DUE,
+)
 
 
 class TestRoutineCreate:

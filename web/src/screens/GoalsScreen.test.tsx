@@ -122,8 +122,36 @@ describe('GoalsScreen editing', () => {
 
     expect(mockApi.PATCH).toHaveBeenCalledWith('/goals/{goal_id}', {
       params: { path: { goal_id: 'g2' } },
-      body: { title: 'Run a half', why: 'Prove I can', deadline: addDays(TODAY, 5), status: 'completed' },
+      body: {
+        title: 'Run a half',
+        why: 'Prove I can',
+        deadline: addDays(TODAY, 5),
+        status: 'completed',
+        color: 'sky',
+      },
     })
+  })
+
+  it('changes the goal colour', async () => {
+    render(<GoalsScreen />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit “Run a marathon”' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit goal' })
+
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Lilac' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApi.PATCH).toHaveBeenCalledWith(
+      '/goals/{goal_id}',
+      expect.objectContaining({ body: expect.objectContaining({ color: 'lilac' }) }),
+    )
+  })
+
+  it('offers no colour choice for a new goal, which gets one automatically', async () => {
+    render(<GoalsScreen />)
+
+    const form = await screen.findByRole('form', { name: 'New goal' })
+
+    expect(within(form).queryByRole('radio')).not.toBeInTheDocument()
   })
 })
 

@@ -191,6 +191,43 @@ BEFORE_ROUTINES = "e04dfba4791d"
 BEFORE_STEPS = "c2497c12038c"
 
 
+class TestGoalColors:
+    def test_upgrade_gives_existing_goals_colours_in_order(
+        self, migrated_db: str, alembic_config: Config
+    ) -> None:
+        command.downgrade(alembic_config, BEFORE_STEPS)
+        try:
+            _run_on_db(migrated_db, _seed_two_goals)
+            command.upgrade(alembic_config, "head")
+            colors = _run_on_db(migrated_db, _seed_goal_colors)
+        finally:
+            _run_on_db(migrated_db, _delete_seed)
+            command.upgrade(alembic_config, "head")
+
+        assert colors == ["sky", "periwinkle"]
+
+
+def _seed_two_goals(connection: Connection) -> None:
+    _seed_task(connection)
+    connection.execute(
+        text(
+            "INSERT INTO goal (id, user_id, title, status, created_at, updated_at)"
+            " VALUES ('00000000-0000-4000-8000-000000000004', :user, 'Later goal',"
+            " 'active', now() + interval '1 minute', now())"
+        ),
+        {"user": SEED_USER_ID},
+    )
+    connection.commit()
+
+
+def _seed_goal_colors(connection: Connection) -> list[str]:
+    rows = connection.execute(
+        text("SELECT color FROM goal WHERE user_id = :id ORDER BY created_at"),
+        {"id": SEED_USER_ID},
+    )
+    return list(rows.scalars())
+
+
 def _seed_user(connection: Connection) -> None:
     _seed_task(connection)
     connection.commit()

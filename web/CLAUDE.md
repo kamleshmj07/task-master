@@ -2,14 +2,26 @@
 
 Loaded when working under `web/`. Project-wide context is in `../CLAUDE.md`.
 
-## Visual design: "Desk lamp" (approved 2026-11-23)
+## Visual design: "Desk lamp", restyled as "First light" (2026-11-25)
 
-Tokens live at the top of `web/src/index.css`; mockup on the canvas
-artifact (artboard "Tasks page – Desk lamp direction").
+Tokens live at the top of `web/src/index.css`. Mockups: the "Task Master –
+First light" canvas (https://claude.ai/artifact/DcuuCsDsedKjBc9RX2fhUD);
+the user chose the Soft graphite shade over deep ocean and dusk plum.
+The brief: upbeat and new, easy on the eyes, nothing gaudy, simple UX.
 
-- Blue-slate room (`--ink #161a24`, `--slate #1f2533`), warm paper text
-  (`--paper #ece6d9`). One lamp: amber `--lamp #f2b544` marks **only** the
+- Soft graphite room (`--ink #1e1f24`, `--slate #292b32`), warm paper text
+  (`--paper #f2ede3`). One lamp: amber `--lamp #f6c25a` marks **only** the
   next step and keyboard focus. Green = done, red = overdue or lost.
+- Goal colours (`--goal-sky` … `--goal-aqua`, stored per goal as `color`)
+  are the one bold idea: a dot on task facts and filter chips, a badge and
+  progress bar on goal cards. Never on a task row's edge (that is the
+  red/green status rail), and never green, red or amber. Set them with
+  `data-goal-color` and `--goal`; `GoalTag` renders a goal's name and dot.
+- Finishing is rewarded: a finished task on Today sits on a green row and
+  its tick glows once (off under reduced motion). Routine ticks are large
+  round buttons that turn green.
+- View tabs are a segmented bar; the selected tab is paper-filled. The
+  current nav item is a filled pill.
 - Primary buttons are paper-filled with ink text, never amber.
 - One family: Atkinson Hyperlegible Next; tabular figures; sentence case.
 - Corners by role: dialogs 16px, panels 12px, controls 8px, chips pill.

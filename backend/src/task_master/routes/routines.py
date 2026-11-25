@@ -68,8 +68,13 @@ async def handle_list_due_routines(
     today = local_today(user.timezone, now)
     due = await load_due_routines(session, user.id, on or today, today)
     return [
-        DueRoutine(routine=RoutineRead.model_validate(r), done=done, streak=streak)
-        for r, done, streak in due
+        DueRoutine(
+            routine=RoutineRead.model_validate(r),
+            done=done,
+            streak=streak,
+            recent_days=recent,
+        )
+        for r, done, streak, recent in due
     ]
 
 
