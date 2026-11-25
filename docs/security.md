@@ -70,21 +70,19 @@ and the Vite dev server needs inline scripts.
 
 ## Known shortcomings (revisit before launch)
 
-1. **One API process only.** Rate limits and the login throttle keep their
-   counters in memory. To stop two processes from silently doubling the
-   limits, production holds a Postgres advisory lock and a second process
-   refuses to start (`single_process.py`). Moving the counters to Redis lifts
-   this cap.
-2. **Zero-downtime deploys may fail because of (1).** Many hosts start the
-   new version before stopping the old one. The old process still holds the
-   lock, so the new one refuses to start. When choosing a host, either make
-   deploys stop the old version first, or change the new process to wait for
-   the lock instead of quitting.
-3. **Password reset and email verification** need an email provider, which
+1. **Password reset and email verification** need an email provider, which
    is not chosen yet.
-4. **Registration reveals whether an email is taken** ("An account with this
+2. **Registration reveals whether an email is taken** ("An account with this
    email already exists"). Fixing it properly needs email: sign-up would then
    always say "check your inbox". Rate limits slow down anyone probing.
+
+Fixed since: the API was limited to one process because rate limits and
+the login throttle counted in memory, which also broke hosts whose deploys
+overlap the old and new version. In production the counters now live in
+Postgres (`rate_limit_window`, `login_account_failure`, `login_ip_failure`;
+emails and addresses only as hashes), shared by every API process, and the
+single-process lock is gone. The clean-up job deletes ended rate-limit
+windows.
 
 ## Security review (2026-11-24)
 

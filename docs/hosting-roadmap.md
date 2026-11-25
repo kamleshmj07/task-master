@@ -36,7 +36,7 @@ The app itself is production-ready; the infrastructure around it is not built.
 | Backups | No database backups; no tested restore. |
 | Monitoring | No uptime check, error tracking, or log collection. |
 | Email | No provider: no password reset or email verification, and sign-up still reveals whether an email is taken. |
-| Code gaps | `/health` does not check the database. The single-process lock makes a new version refuse to start while the old one runs, so hosts whose zero-downtime deploys overlap old and new will fail to deploy (see below). |
+| Code gaps | `/health` does not check the database. (The single-process lock is fixed, see below.) |
 | Launch basics | Privacy policy and terms; a way for users to export their data. |
 | Optional | The font loads from Google Fonts; serving it ourselves would avoid sending users to a third party. |
 
@@ -48,9 +48,11 @@ Postgres advisory lock and a second API process refuses to start
 before stopping the old one, so the new one refuses to start and the deploy
 fails.
 
-**Proposed fix:** keep the counters in Postgres instead of memory. That lifts
-the one-process limit everywhere, works on every host below, and closes the
-parked security finding about it. It is a moderate change.
+**Fix (done 2026-11-25, branch `feature/shared-rate-limits`):** in
+production the counters now live in Postgres, shared by every API process,
+and the lock is gone. That lifts the one-process limit everywhere, works on
+every host below, and closes the parked security finding about it. Where the
+tables below say "needs the fix", that is now done.
 
 ## Top 5 paid options
 
@@ -107,6 +109,12 @@ counters move to Postgres; they also need a pooled database connection.
 | **Vercel** | Excellent (static hosting, headers in `vercel.json`) | Runs FastAPI as serverless functions (Python 3.12–3.14), but only after the Postgres-counters change and removing the single-process lock; the clean-up job would become a protected endpoint called by Vercel Cron | Hobby free but personal, non-commercial only (paused at its limits); Pro $20/month + usage | Good for the web app; a poor fit for the API today |
 | **Heroku** | Possible, but wasteful (needs a dyno) | Fits as is: one long-running dyno; deploys without preboot stop the old dyno first | No free tier. Basic dyno $7 + Postgres Essential-0 $5 ≈ $12/month (Eco $5 dynos sleep after 30 min) | Works, but no cheaper than Render, and reports describe Heroku as in "sustaining mode" (maintained, not growing) |
 | **Netlify** | Excellent (free plan, headers in `_headers`) | No: functions are JavaScript/TypeScript and Go; first-class Python is not confirmed | Free plan: 300 credits a month, hard limit | Good for the web app only |
+
+**Cloudways** (checked 2026-11-25) is managed hosting built mainly for
+PHP and WordPress, on top of DigitalOcean, Vultr and other clouds, from about
+$11–14 a month. Its newer Velocity plans ($20/month) run Node.js apps with
+Postgres on the same server. No first-class Python, FastAPI or Docker
+support was found, and no managed Postgres, so it does not suit the API.
 
 **Conclusion:** none of the three beats the recommended setup. Vercel or
 Netlify could replace Cloudflare Pages for the web app; the API is still best
@@ -189,6 +197,9 @@ Yes: buy one domain and host most apps under it.
 - [Netlify pricing 2026 (kuberns.com)](https://kuberns.com/blogs/netlify-pricing/)
 - [Netlify free plan limits (getvoroa.com)](https://getvoroa.com/blog/netlify-free-plan-limits/)
 - [Netlify review 2026 (dupple.com)](https://dupple.com/reviews/netlify)
+- [Cloudways review 2026 (devopscube.com)](https://devopscube.com/cloudways-review/)
+- [Cloudways vs DigitalOcean (getdeploying.com)](https://getdeploying.com/cloudways-vs-digitalocean)
+- [Cloudways Velocity vs Render (appstackbuilder.com)](https://appstackbuilder.com/compare/cloudways-velocity-vs-render)
 - [Cloudflare plans](https://www.cloudflare.com/plans/)
 - [Cloudflare Registrar pricing (frontdeskreview.com)](https://frontdeskreview.com/software/domain-registrars/cloudflare-registrar/)
 - [Cloudflare Registrar review (startupowl.com)](https://startupowl.com/reviews/cloudflare-registrar)

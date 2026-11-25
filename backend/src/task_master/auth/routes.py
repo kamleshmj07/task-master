@@ -89,7 +89,7 @@ async def _authenticate(
     throttle: LoginThrottle = request.app.state.login_throttle
     ip = request.client.host if request.client else "unknown"
     email = credentials.username
-    wait = throttle.retry_after(ip, email)
+    wait = await throttle.retry_after(ip, email)
     if wait:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -98,13 +98,13 @@ async def _authenticate(
         )
     user = await users.authenticate(credentials)
     if user is None or not user.is_active:
-        throttle.record_failure(ip, email)
+        await throttle.record_failure(ip, email)
         logger.warning("Failed login attempt")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
         )
-    throttle.record_success(email)
+    await throttle.record_success(email)
     return user
 
 

@@ -3,19 +3,17 @@
 Rate limits apply to every endpoint except the health check, per signed-in
 session (or per client IP when there is none). Reads and writes have their
 own budgets. Every request also counts against its client IP, so inventing a
-new token per request cannot dodge the limits. Counters live in process
-memory, which is why production runs a single API process
-(`single_process.py`).
+new token per request cannot dodge the limits. In production the counters
+live in Postgres, shared by every API process (`auth/rate_limit.py`).
 """
 
-import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 
-from task_master.auth.rate_limit import RateLimiter
+from task_master.auth.rate_limit import RateLimiter, WindowStore, hash_key
 from task_master.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -41,11 +39,13 @@ HSTS = "max-age=31536000; includeSubDomains"
 Handler = Callable[[Request], Awaitable[Response]]
 
 
-def install_security(app: FastAPI, settings: Settings) -> None:
-    """Add the hardening middleware to `app`."""
-    read_limiter = RateLimiter(settings.api_rate_limit)
-    write_limiter = RateLimiter(settings.api_write_rate_limit)
-    ip_limiter = RateLimiter(settings.api_ip_rate_limit)
+def install_security(
+    app: FastAPI, settings: Settings, new_store: Callable[[], WindowStore]
+) -> None:
+    """Add the hardening middleware to `app`, counting in stores from `new_store`."""
+    read_limiter = RateLimiter(settings.api_rate_limit, new_store())
+    write_limiter = RateLimiter(settings.api_write_rate_limit, new_store())
+    ip_limiter = RateLimiter(settings.api_ip_rate_limit, new_store())
     headers = security_headers(production=settings.environment == "production")
 
     @app.middleware("http")
@@ -55,10 +55,10 @@ def install_security(app: FastAPI, settings: Settings) -> None:
         client = client_key(request)
         writing = request.method in WRITE_METHODS
         limiter = write_limiter if writing else read_limiter
-        refused_by = _over_limit(
+        refused_by = await _over_limit(
             request,
-            (ip_limiter, f"ip:{ip_key(request)}"),
-            (limiter, f"{writing}:{client}"),
+            (ip_limiter, f"api-ip:{ip_key(request)}"),
+            (limiter, f"{'write' if writing else 'read'}:{client}"),
         )
         if refused_by is None:
             response = await call_next(request)
@@ -81,29 +81,25 @@ def client_key(request: Request) -> str:
     """Who is calling, without personal data: a hash of the session or IP."""
     authorization = request.headers.get("authorization")
     if authorization:
-        return f"session:{_digest(authorization)}"
+        return f"session:{hash_key(authorization)}"
     return f"ip:{ip_key(request)}"
 
 
 def ip_key(request: Request) -> str:
     """A hash of the client address (the real one behind trusted proxies)."""
-    return _digest(request.client.host if request.client else "unknown")
+    return hash_key(request.client.host if request.client else "unknown")
 
 
-def _over_limit(
+async def _over_limit(
     request: Request, *budgets: tuple[RateLimiter, str]
 ) -> RateLimiter | None:
     """Count the request against every budget; return the first one exceeded."""
     if request.url.path in EXEMPT_PATHS:
         return None
     for limiter, key in budgets:
-        if not limiter.hit(key):
+        if not await limiter.hit(key):
             return limiter
     return None
-
-
-def _digest(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()[:16]
 
 
 def _too_many_requests(limiter: RateLimiter) -> Response:

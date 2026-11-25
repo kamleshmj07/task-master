@@ -1,6 +1,6 @@
 """FastAPI application factory."""
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -8,8 +8,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from task_master.auth import routes as auth_routes
-from task_master.auth.lockout import LockoutPolicy, LoginThrottle
-from task_master.auth.rate_limit import RateLimiter, enforce_auth_rate_limit
+from task_master.auth.lockout import (
+    LockoutPolicy,
+    LoginThrottle,
+    MemoryThrottleStore,
+    PostgresThrottleStore,
+    ThrottleStore,
+)
+from task_master.auth.rate_limit import (
+    MemoryWindowStore,
+    PostgresWindowStore,
+    RateLimiter,
+    WindowStore,
+    enforce_auth_rate_limit,
+)
 from task_master.auth.schemas import UserCreate, UserRead, UserUpdate
 from task_master.auth.users import fastapi_users
 from task_master.config import Settings, get_settings
@@ -27,7 +39,6 @@ from task_master.routes import (
     tasks,
 )
 from task_master.security import install_security
-from task_master.single_process import hold_single_process_lock
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -39,12 +50,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-        lock = await hold_single_process_lock(engine) if is_production else None
         try:
             yield
         finally:
-            if lock is not None:
-                await lock.close()
             await engine.dispose()
 
     configure_logging()
@@ -56,9 +64,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.session_factory = create_session_factory(engine)
-    app.state.auth_rate_limiter = RateLimiter(settings.auth_rate_limit)
-    app.state.login_throttle = LoginThrottle(_lockout_policy(settings))
+    session_factory = create_session_factory(engine)
+    app.state.session_factory = session_factory
+    # Production shares counters through Postgres, so it may run any number of
+    # API processes; elsewhere each process counts in memory.
+    new_window_store: Callable[[], WindowStore] = (
+        (lambda: PostgresWindowStore(session_factory))
+        if is_production
+        else MemoryWindowStore
+    )
+    throttle_store: ThrottleStore = (
+        PostgresThrottleStore(session_factory)
+        if is_production
+        else MemoryThrottleStore()
+    )
+    app.state.auth_rate_limiter = RateLimiter(
+        settings.auth_rate_limit, new_window_store()
+    )
+    app.state.login_throttle = LoginThrottle(_lockout_policy(settings), throttle_store)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -66,7 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
-    install_security(app, settings)
+    install_security(app, settings, new_window_store)
     if settings.trusted_proxies:
         # Outermost, so rate limits and logs see the real client address.
         app.add_middleware(

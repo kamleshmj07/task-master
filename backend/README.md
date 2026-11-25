@@ -119,8 +119,10 @@ Tune with the `TASK_MASTER_LOGIN_*` settings in `config.py`.
 Register and refresh keep a simple per-IP limit
 (`TASK_MASTER_AUTH_RATE_LIMIT`, default `5/minute`).
 
-All counters live in memory, so they are per worker and reset on restart;
-move them to Redis before scaling out.
+In production all counters live in Postgres, shared by every API process,
+so the API can run as many processes as it likes; emails and client addresses
+are stored only as hashes. Development and tests count in memory. The
+clean-up job deletes ended rate-limit windows.
 
 The web refresh cookie is `SameSite=Strict`, so in production the web app and
 the API must share a registrable domain (e.g. `app.example.com` and

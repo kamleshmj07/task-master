@@ -13,6 +13,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     MetaData,
     SmallInteger,
     String,
@@ -495,3 +496,46 @@ class Notification(Base):
         DateTime(timezone=True), default=utc_now, index=True
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RateLimitWindow(Base):
+    """Requests counted for one rate-limit key in one fixed time window.
+
+    Shared by every API process, so limits hold however many run. Windows
+    past `expires_at` no longer count and are deleted by the clean-up job.
+    """
+
+    __tablename__ = "rate_limit_window"
+
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), primary_key=True
+    )
+    hits: Mapped[int] = mapped_column()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class LoginAccountFailure(Base):
+    """Recent failed logins for one account, keyed by a hash of its email.
+
+    Rows exist whether or not the account does, so they reveal nothing about
+    which emails are registered. A success or a quiet spell removes them.
+    """
+
+    __tablename__ = "login_account_failure"
+
+    account_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failures: Mapped[int] = mapped_column()
+    last_failure: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class LoginIpFailure(Base):
+    """One failed login from one client address (stored only as a hash)."""
+
+    __tablename__ = "login_ip_failure"
+    __table_args__ = (Index(None, "ip_key", "failed_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    ip_key: Mapped[str] = mapped_column(String(64))
+    failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -8,6 +8,7 @@ from pydantic import SecretStr
 
 from task_master.config import Settings
 from task_master.main import create_app
+from tests.conftest import clear_rate_limit_windows
 
 pytestmark = pytest.mark.anyio
 
@@ -77,14 +78,19 @@ class TestHeaders:
 
 
 class TestProductionSurface:
-    async def test_hides_the_api_schema_in_production(self) -> None:
+    @pytest.mark.db
+    async def test_hides_the_api_schema_in_production(self, migrated_db: str) -> None:
         settings = make_settings(
             environment="production",
             cors_origins=["https://app.example.com"],
             auth_secret=SecretStr("x" * 32),
+            database_url=SecretStr(migrated_db),
         )
-        async with client_for(settings) as client:
-            response = await client.get("/openapi.json")
+        try:
+            async with client_for(settings) as client:
+                response = await client.get("/openapi.json")
+        finally:
+            await clear_rate_limit_windows(migrated_db)
 
         assert response.status_code == 404
 
@@ -165,6 +171,31 @@ class TestRateLimits:
             response = await client.get("/nope")
 
         assert response.headers["retry-after"] == "60"
+
+
+@pytest.mark.db
+class TestSharedLimits:
+    """Production keeps counters in Postgres, so several processes can run."""
+
+    async def test_two_api_processes_share_one_budget(self, migrated_db: str) -> None:
+        settings = make_settings(
+            environment="production",
+            cors_origins=["https://app.example.com"],
+            auth_secret=SecretStr("x" * 40),
+            database_url=SecretStr(migrated_db),
+            api_ip_rate_limit="2/minute",
+        )
+        try:
+            async with client_for(settings) as first, client_for(settings) as second:
+                statuses = [
+                    (await first.get("/nope")).status_code,
+                    (await second.get("/nope")).status_code,
+                    (await first.get("/nope")).status_code,
+                ]
+        finally:
+            await clear_rate_limit_windows(migrated_db)
+
+        assert statuses == [404, 404, 429]
 
 
 class TestProxies:
