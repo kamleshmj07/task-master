@@ -37,11 +37,19 @@ export function refreshSession(): Promise<boolean> {
 }
 
 /** Retry a request once with a fresh access token when it gets a 401. */
+/**
+ * Whether `url` is an auth endpoint, wherever the API lives: at the root
+ * (`http://localhost:8000/auth/...`) or under a path (`/api/auth/...`).
+ */
+export function isAuthPath(url: string, apiUrl: string = API_URL): boolean {
+  const base = new URL(apiUrl, 'https://placeholder.invalid').pathname.replace(/\/$/, '')
+  return new URL(url, 'https://placeholder.invalid').pathname.startsWith(`${base}/auth/`)
+}
+
 export async function fetchWithRefresh(request: Request): Promise<Response> {
   const retry = request.clone()
   const response = await fetch(request)
-  const isAuthCall = new URL(request.url).pathname.startsWith('/auth/')
-  if (response.status !== 401 || isAuthCall || !(await refreshSession())) {
+  if (response.status !== 401 || isAuthPath(request.url) || !(await refreshSession())) {
     return response
   }
   retry.headers.set('Authorization', `Bearer ${accessToken ?? ''}`)

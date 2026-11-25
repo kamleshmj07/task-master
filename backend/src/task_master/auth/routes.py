@@ -127,12 +127,31 @@ async def _rotate(
     return user, replacement
 
 
+def _refresh_cookie_path(settings: Settings) -> str:
+    """Where the browser sends the refresh cookie: the web auth routes only.
+
+    Includes `api_prefix`, the path the API is served under (e.g. `/api` on
+    Vercel), or the browser would never send the cookie back.
+    """
+    return f"{settings.api_prefix}{WEB_PREFIX}"
+
+
+def _clear_refresh_cookie(response: Response, settings: Settings) -> None:
+    response.delete_cookie(
+        REFRESH_COOKIE,
+        path=_refresh_cookie_path(settings),
+        secure=True,
+        httponly=True,
+        samesite="strict",
+    )
+
+
 def _set_refresh_cookie(response: Response, token: str, settings: Settings) -> None:
     response.set_cookie(
         REFRESH_COOKIE,
         token,
         max_age=int(_refresh_lifetime(settings).total_seconds()),
-        path=WEB_PREFIX,
+        path=_refresh_cookie_path(settings),
         secure=True,
         httponly=True,
         samesite="strict",
@@ -199,6 +218,7 @@ async def handle_web_logout(
     user_token: CurrentUserTokenDep,
     strategy: StrategyDep,
     session: SessionDep,
+    settings: SettingsDep,
     refresh_token: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ) -> None:
     """Revoke the access token and refresh cookie, and clear the cookie."""
@@ -206,9 +226,7 @@ async def handle_web_logout(
     await strategy.destroy_token(access_token, user)
     if refresh_token:
         await revoke_refresh_token(session, user.id, refresh_token)
-    response.delete_cookie(
-        REFRESH_COOKIE, path=WEB_PREFIX, secure=True, httponly=True, samesite="strict"
-    )
+    _clear_refresh_cookie(response, settings)
 
 
 @mobile_router.post("/login")
@@ -259,6 +277,7 @@ async def handle_delete_account(
     response: Response,
     user: CurrentUserDep,
     users: UserManagerDep,
+    settings: SettingsDep,
 ) -> None:
     """Delete the account and everything it owns, after re-checking the password.
 
@@ -277,6 +296,4 @@ async def handle_delete_account(
         ) from error
     await users.delete(user)
     logger.info("Account deleted")
-    response.delete_cookie(
-        REFRESH_COOKIE, path=WEB_PREFIX, secure=True, httponly=True, samesite="strict"
-    )
+    _clear_refresh_cookie(response, settings)

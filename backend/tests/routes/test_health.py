@@ -21,3 +21,22 @@ class TestHealth:
         response = await client.post("/health")
 
         assert response.status_code == 405
+
+
+class TestReadiness:
+    @pytest.mark.db
+    async def test_ok_when_the_database_answers(self, api_client: AsyncClient) -> None:
+        response = await api_client.get("/health/ready")
+
+        assert (response.status_code, response.json()) == (200, {"status": "ok"})
+
+    async def test_503_when_the_database_is_unreachable(
+        self, client: AsyncClient
+    ) -> None:
+        # The `client` fixture's database URL points nowhere.
+        response = await client.get("/health/ready")
+
+        assert (response.status_code, response.json()) == (
+            503,
+            {"status": "unavailable"},
+        )

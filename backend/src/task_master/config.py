@@ -1,9 +1,9 @@
 """Application configuration loaded from environment variables."""
 
 from functools import lru_cache
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import PositiveInt, SecretStr, model_validator
+from pydantic import PositiveInt, SecretStr, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SECRET_LENGTH = 32
@@ -21,7 +21,13 @@ class Settings(BaseSettings):
     app_name: str = "Task Master API"
     environment: Literal["development", "test", "production"] = "development"
     cors_origins: list[str] = ["http://localhost:5173"]
+    # Path every route is served under, e.g. "/api" when the web app and the
+    # API share one address (Vercel). Empty: routes start at the root.
+    api_prefix: Annotated[str, StringConstraints(pattern=r"^(/[a-z0-9-]+)*$")] = ""
     database_url: SecretStr
+    # True behind a connection pooler such as Neon's (serverless hosting):
+    # no pool of our own and no prepared-statement cache.
+    database_pooled: bool = False
     auth_secret: SecretStr
     access_token_lifetime_seconds: int = 15 * 60
     refresh_token_lifetime_days: int = 30

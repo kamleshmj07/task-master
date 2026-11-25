@@ -56,30 +56,28 @@ then merge before Part B.
 
 ### A1. One Vercel project for web and API
 
-Vercel's "Services" let one project hold a frontend and a backend, routed by
-path. Vercel's official **Vite + FastAPI starter** template uses exactly
-this; copy its root `vercel.json` and adapt it rather than writing one from
-memory:
+**Done:** the root `vercel.json`. Vercel's "Services" (in beta, available on
+all plans including Hobby) let one project hold a frontend and a backend,
+routed by path:
 
-- frontend service: root `web`, framework Vite, built with the npm workspace
-  (it needs `packages/api-client` from the repo root);
-- backend service: root `backend`, FastAPI, entrypoint `app:app` (A2);
-- a rewrite sending `/api/(.*)` to the backend service; everything else goes
-  to the frontend.
+- `web` service: root `web/`, Vite, installed from the repo root (it needs
+  `packages/api-client` from the npm workspace), built with `VITE_API_URL=/api`,
+  with the security headers (A8);
+- `api` service: root `backend/`, entrypoint `app:app` (A2);
+- rewrites: `/api/(.*)` to `api`, everything else to `web`.
 
-Check one detail on the first deploy: whether the backend receives paths
-**with** the `/api` prefix (`/api/goals`) or **without** it (`/goals`). A3
-handles both, but must be set to match.
+Vercel's docs say a service receives the **original** request path:
+`/api/goals` arrives as `/api/goals`, not `/goals`. So the API serves its
+routes under `/api` (A3).
 
-If Services are not available on Hobby when you try, the fallback is two
-projects where the web project's `vercel.json` rewrites `/api/:path*` to the
-API project's address (a proxy). That keeps one address for the browser, but
-check the API still sees real visitor addresses, not Vercel's proxy (step 11,
-point 6).
+If Services ever fail, the fallback is two projects where the web project's
+`vercel.json` rewrites `/api/:path*` to the API project's address (a proxy).
+That keeps one address for the browser, but check the API still sees real
+visitor addresses, not Vercel's proxy (step 11, point 6).
 
 ### A2. A Vercel entrypoint for the API
 
-Vercel finds a FastAPI app named `app` in `app.py`, `index.py`, `main.py` and
+**Done:** `backend/app.py`. Vercel finds a FastAPI app named `app` in `app.py`, `index.py`, `main.py` and
 similar names. Our app is built by a factory, so add `backend/app.py`:
 
 ```python
@@ -103,32 +101,26 @@ Python: the project uses 3.14, which Vercel lists as supported. Vercel reads
 
 ### A3. Serving the API under `/api`
 
-Add a setting `TASK_MASTER_ROOT_PATH` (default empty):
-
-- If the backend receives `/api/...` paths (prefix kept), set it to `/api`
-  and have `create_app` mount the API under that prefix.
-- If Vercel strips the prefix, leave the routes as they are.
-
-Either way the **refresh cookie path** must match what the browser sees:
-today it is `/auth/web`; behind `/api` it must be `/api/auth/web`, or the
-browser never sends the cookie back and users are signed out on every
-reload. Make the cookie path `{public prefix}/auth/web`, with the public
-prefix as a setting (for example `TASK_MASTER_PUBLIC_PREFIX=/api`), and test
-it.
+**Done:** the setting `TASK_MASTER_API_PREFIX` (default empty, so local
+development is unchanged). Set to `/api`, every route, the development docs,
+the rate-limit exemption for the health checks, and the **refresh cookie
+path** move under it. The cookie path matters most: behind `/api` it must be
+`/api/auth/web`, or the browser never sends the cookie back and users are
+signed out on every reload.
 
 ### A4. Web app calls the API on the same address
 
-Build the web app with `VITE_API_URL=/api` (a relative address), so every
-call goes to `https://<your address>/api/...`. Check that `web/src/api.ts`
-and the generated client accept a relative base URL, and test it.
+**Done:** the web app is built with `VITE_API_URL=/api` (a relative
+address), so every call goes to `https://<your address>/api/...`. Its check
+for sign-in calls (which must never trigger a token refresh) now works
+under a prefix too.
 
 ### A5. Database connections fit for serverless
 
-Each function copy would otherwise keep its own pool of connections. Use
+**Done:** the setting `TASK_MASTER_DATABASE_POOLED`. Each function copy would otherwise keep its own pool of connections. Use
 Neon's **pooled** connection (PgBouncer in transaction mode) and stop asyncpg
-from caching prepared statements, which PgBouncer cannot share. Add a setting
-such as `TASK_MASTER_DATABASE_POOLED: bool = False`; when true, create the
-engine with:
+from caching prepared statements, which PgBouncer cannot share. When
+`TASK_MASTER_DATABASE_POOLED=true`, the engine is created with:
 
 ```python
 create_async_engine(
@@ -149,14 +141,15 @@ postgresql+asyncpg://USER:PASSWORD@HOST-pooler.REGION.aws.neon.tech/DB?ssl=requi
 The same host without `-pooler` is the **direct** connection, used for
 migrations and the clean-up job.
 
-### A6. `/health` checks the database
+### A6. A health check that includes the database
 
-Make `/health` run `SELECT 1` and answer 503 if the database is unreachable,
-so an uptime check reports a broken database, not just a running function.
+**Done:** `/health` stays a quick "the API is up" answer, and the new
+`/health/ready` also runs `SELECT 1`, answering 503 if the database is
+unreachable. Point uptime checks at `/health/ready`.
 
 ### A7. The real client address
 
-Vercel puts the visitor's address in `x-forwarded-for` and overwrites any
+No code change: a setting for the Vercel project (step 5). Vercel puts the visitor's address in `x-forwarded-for` and overwrites any
 value the visitor sent, so on Vercel the header can be trusted. Set
 `TASK_MASTER_TRUSTED_PROXIES=["*"]` in production so rate limits and the
 login throttle see real addresses. Only do this on Vercel: anywhere the API
@@ -164,7 +157,7 @@ can be reached directly, `*` would let clients fake their address.
 
 ### A8. Security headers for the web app
 
-In the root `vercel.json`, add the headers from `docs/security.md` for the
+**Done**, in the `web` service of the root `vercel.json`:  the headers from `docs/security.md` for the
 web app's pages. Because the API is on the same address, `connect-src` is
 simply `'self'`:
 
@@ -265,8 +258,7 @@ Replace `task-master.vercel.app` with your actual address.
 | `TASK_MASTER_AUTH_SECRET` | the secret from step 3 |
 | `TASK_MASTER_CORS_ORIGINS` | `["https://task-master.vercel.app"]` |
 | `TASK_MASTER_TRUSTED_PROXIES` | `["*"]` |
-| `TASK_MASTER_ROOT_PATH` / `TASK_MASTER_PUBLIC_PREFIX` | as decided in A3 |
-| `VITE_API_URL` | `/api` |
+| `TASK_MASTER_API_PREFIX` | `/api` |
 
 Production refuses to start without an HTTPS origin and a 32+ character
 secret, so a typo shows up as a failed deploy, not a weak setup. (All calls
@@ -290,16 +282,17 @@ GitHub → repository → Settings → Secrets and variables → Actions:
 Run the `deploy` workflow (or push to `master`): it migrates the empty Neon
 database to the latest schema, then deploys web and API together.
 
-### 8. Check which `/api` setting is right
+### 8. Check the API is reachable
 
-Open `https://task-master.vercel.app/api/health`. If it answers
-`{"status": "ok"}`, the prefix setting from A3 matches. If it answers 404,
-switch the setting (prefix kept vs stripped) and redeploy.
+Open `https://task-master.vercel.app/api/health/ready`. It should answer
+`{"status": "ok"}`, which means the API runs and reaches the database. A 404
+means `TASK_MASTER_API_PREFIX` is not `/api`; a 503 means the database URL is
+wrong or Neon is unreachable.
 
 ### 9. Monitoring
 
 - Add a free uptime check (for example UptimeRobot or Better Stack) on
-  `https://task-master.vercel.app/api/health`, every 5 minutes, alerting by
+  `https://task-master.vercel.app/api/health/ready`, every 5 minutes, alerting by
   email.
 - Vercel → the project → Logs shows API errors and our JSON security logs.
 
@@ -314,8 +307,8 @@ into a scratch database once, so you know it works.
 
 ### 11. Smoke test
 
-1. `/api/health` answers `{"status": "ok"}`; `/api/docs` answers 404 (hidden
-   in production).
+1. `/api/health/ready` answers `{"status": "ok"}`; `/api/docs` answers 404
+   (hidden in production).
 2. Open the address, create an account, sign in, then **reload the page**:
    you stay signed in. This proves the refresh cookie and its path work.
 3. Add a goal, a task and a routine; tick a step.

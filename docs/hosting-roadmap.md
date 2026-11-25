@@ -21,14 +21,14 @@ branch.
 | **1. Code** | One-project setup (`vercel.json` with web and API services); API entrypoint; API under `/api` with the refresh cookie path to match; web app calling `/api`; pooled database engine; `/health` checks the database; trusted visitor addresses; web security headers | Part A1–A8, A11 | Tests pass, merged to `master` |
 | **2. Automation** | GitHub workflows: migrate then deploy; daily clean-up; nightly backup | Part A9–A10, step 10 | Workflows in `master` |
 | **3. Accounts** | Vercel Hobby account; Neon Free database (same region as the API); auth secret | Steps 1–3 | Database reachable |
-| **4. First deploy** | Create the project, set environment variables and GitHub secrets, run the deploy workflow | Steps 4–8 | `/api/health` answers ok |
+| **4. First deploy** | Create the project, set environment variables and GitHub secrets, run the deploy workflow | Steps 4–8 | `/api/health/ready` answers ok |
 | **5. Verify** | Smoke test, uptime check, logs | Steps 9, 11 | All smoke-test points pass |
 | **6. Own domain** (later) | Buy on Cloudflare, add to Vercel, update the allowed origin | Part F | App on your domain |
 | **7. Public launch** (later) | Email provider, privacy policy and terms, data export, self-hosted font; Vercel Pro before any paid features | "Later" | Ready for strangers |
 
-**Open questions to settle during phase 1:** whether Vercel Services are on
-the Hobby plan (fallback: two projects with a rewrite), and whether the API
-receives the `/api` prefix (a setting covers both).
+**Settled in phase 1:** Vercel Services are available on all plans (in
+beta), and a service receives the original path, so the API serves its
+routes under `/api` (`TASK_MASTER_API_PREFIX`).
 
 ## Where we stand
 
