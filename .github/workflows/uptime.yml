@@ -1,0 +1,40 @@
+# Uptime check for the deployed app. Off until the repository variable
+# UPTIME_CHECK is "on" (Settings > Secrets and variables > Actions >
+# Variables); APP_URL is the app's address, e.g. https://task-master.vercel.app
+#
+# Every 15 minutes it calls /api/health, which never touches the database,
+# so Neon's free database can still sleep when nobody uses the app. Once a
+# day, and when run by hand, it calls /api/health/ready, which also checks
+# the database (waking it for a few minutes). A failed run means the app is
+# down; GitHub emails you about failed runs.
+name: Uptime check
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    if: vars.UPTIME_CHECK == 'on' && vars.APP_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the health check
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SCHEDULE: ${{ github.event.schedule }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          path="/api/health"
+          if [ "$SCHEDULE" = "0 7 * * *" ] || [ "$EVENT" = "workflow_dispatch" ]; then
+            path="/api/health/ready"
+          fi
+          echo "Checking ${path}"
+          # Retries give a sleeping database time to wake up.
+          curl --fail --silent --show-error --max-time 30 \
+            --retry 3 --retry-delay 20 --retry-all-errors \
+            "${APP_URL%/}${path}"

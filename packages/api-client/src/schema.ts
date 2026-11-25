@@ -13,9 +13,31 @@ export interface paths {
         };
         /**
          * Get Health
-         * @description Report that the API is up.
+         * @description Report that the API is up (without touching the database).
          */
         get: operations["get_health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Readiness
+         * @description Report whether the API can serve requests: 503 if the database is down.
+         *
+         *     Point uptime checks here, so a broken database is noticed.
+         */
+        get: operations["get_readiness_health_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1157,6 +1179,17 @@ export interface components {
             created_at: string;
         };
         /**
+         * ReadinessResponse
+         * @description Readiness payload: "unavailable" when the database cannot be reached.
+         */
+        ReadinessResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /**
          * RefreshRequest
          * @description Refresh token sent by mobile clients.
          */
@@ -1616,6 +1649,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_readiness_health_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
                 };
             };
         };

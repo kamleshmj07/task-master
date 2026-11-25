@@ -162,6 +162,18 @@ npm run dev -w @task-master/web -- --host localhost --port 5173   # from repo ro
   share them and zero-downtime deploys work. Development and tests count in
   memory; tests that build a production app need the test database. The
   single-process lock is gone. Limits use fixed windows aligned to the clock.
+- **Vercel hosting (2026-11-25, branch `task-master-vercel`).** One Vercel
+  project serves the web app and the API on one address (root `vercel.json`,
+  Vercel Services; `backend/app.py` is the API entrypoint). The API serves
+  its routes under `TASK_MASTER_API_PREFIX` (`/api` on Vercel, empty
+  locally), and the refresh cookie path follows it (`/api/auth/web`), or
+  sign-in breaks on reload. `TASK_MASTER_DATABASE_POOLED=true` drops our own
+  pool and asyncpg's statement cache for Neon's PgBouncer. `/health` is
+  liveness and never touches the database; `/health/ready` also checks the
+  database, so call it rarely (daily), or Neon's free database never sleeps
+  and runs out of hours. Uptime check: `.github/workflows/uptime.yml`, off
+  until the repository variable `UPTIME_CHECK` is `on` (and `APP_URL` set). Guide: `docs/vercel-deployment.md`; roadmap:
+  `docs/hosting-roadmap.md`.
 
 ## Visual design and code conventions
 

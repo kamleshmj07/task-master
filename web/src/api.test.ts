@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { errorMessage, fetchWithRefresh, setAccessToken } from '@/api'
+import { errorMessage, fetchWithRefresh, isAuthPath, setAccessToken } from '@/api'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -54,6 +54,24 @@ describe('fetchWithRefresh', () => {
     await fetchWithRefresh(new Request('http://api.test/auth/web/logout'))
 
     expect(fetchMock.mock.calls.length).toBe(1)
+  })
+})
+
+describe('isAuthPath', () => {
+  it('spots auth calls when the API is at the root', () => {
+    expect(isAuthPath('http://localhost:8000/auth/web/login', 'http://localhost:8000')).toBe(true)
+  })
+
+  it('spots auth calls when the API is under /api', () => {
+    expect(isAuthPath('https://app.vercel.app/api/auth/web/login', '/api')).toBe(true)
+  })
+
+  it('does not count other calls under /api', () => {
+    expect(isAuthPath('https://app.vercel.app/api/tasks', '/api')).toBe(false)
+  })
+
+  it('does not count a root auth path when the API is under /api', () => {
+    expect(isAuthPath('https://app.vercel.app/auth/web/login', '/api')).toBe(false)
   })
 })
 

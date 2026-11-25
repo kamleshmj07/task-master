@@ -44,7 +44,10 @@ from task_master.security import install_security
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI app with middleware and routes."""
     settings = settings or get_settings()
-    engine = create_engine(settings.database_url.get_secret_value())
+    engine = create_engine(
+        settings.database_url.get_secret_value(), pooled=settings.database_pooled
+    )
+    prefix = settings.api_prefix
 
     is_production = settings.environment == "production"
 
@@ -58,8 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     app = FastAPI(
         title=settings.app_name,
-        docs_url=None if is_production else "/docs",
-        openapi_url=None if is_production else "/openapi.json",
+        docs_url=None if is_production else f"{prefix}/docs",
+        openapi_url=None if is_production else f"{prefix}/openapi.json",
         redoc_url=None,
         lifespan=lifespan,
     )
@@ -95,7 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxies
         )
-    _include_routers(app)
+    _include_routers(app, prefix)
     return app
 
 
@@ -110,29 +113,32 @@ def _lockout_policy(settings: Settings) -> LockoutPolicy:
     )
 
 
-def _include_routers(app: FastAPI) -> None:
-    """Mount every route module."""
-    app.include_router(health.router)
+def _include_routers(app: FastAPI, prefix: str) -> None:
+    """Mount every route module under `prefix` (empty, or e.g. "/api")."""
+    app.include_router(health.router, prefix=prefix)
     app.include_router(
         fastapi_users.get_register_router(UserRead, UserCreate),
-        prefix="/auth",
+        prefix=f"{prefix}/auth",
         tags=["auth"],
         dependencies=[Depends(enforce_auth_rate_limit)],
     )
-    app.include_router(auth_routes.web_router)
-    app.include_router(auth_routes.mobile_router)
+    app.include_router(auth_routes.web_router, prefix=prefix)
+    app.include_router(auth_routes.mobile_router, prefix=prefix)
     # Before the fastapi-users router, whose `/users/{id}` would claim "me".
-    app.include_router(auth_routes.account_router)
+    app.include_router(auth_routes.account_router, prefix=prefix)
     app.include_router(
         fastapi_users.get_users_router(UserRead, UserUpdate),
-        prefix="/users",
+        prefix=f"{prefix}/users",
         tags=["users"],
     )
-    app.include_router(goals.router)
-    app.include_router(tasks.router)
-    app.include_router(steps.router)
-    app.include_router(postponements.router)
-    app.include_router(routines.router)
-    app.include_router(plans.router)
-    app.include_router(notifications.router)
-    app.include_router(onboarding.router)
+    for router in (
+        goals.router,
+        tasks.router,
+        steps.router,
+        postponements.router,
+        routines.router,
+        plans.router,
+        notifications.router,
+        onboarding.router,
+    ):
+        app.include_router(router, prefix=prefix)

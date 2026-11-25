@@ -64,3 +64,33 @@ class TestSettings:
 
         with pytest.raises(ValidationError):
             load_settings()
+
+
+class TestApiPrefix:
+    def test_defaults_to_no_prefix(self) -> None:
+        assert load_settings().api_prefix == ""
+
+    @pytest.mark.parametrize("prefix", ["/api", "/v1/api"])
+    def test_accepts_a_path(self, monkeypatch: pytest.MonkeyPatch, prefix: str) -> None:
+        monkeypatch.setenv("TASK_MASTER_API_PREFIX", prefix)
+
+        assert load_settings().api_prefix == prefix
+
+    @pytest.mark.parametrize("prefix", ["api", "/api/", "/", "/API", "/a b"])
+    def test_rejects_anything_else(
+        self, monkeypatch: pytest.MonkeyPatch, prefix: str
+    ) -> None:
+        monkeypatch.setenv("TASK_MASTER_API_PREFIX", prefix)
+
+        with pytest.raises(ValidationError):
+            load_settings()
+
+
+class TestDatabasePooled:
+    def test_defaults_to_false(self) -> None:
+        assert load_settings().database_pooled is False
+
+    def test_reads_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TASK_MASTER_DATABASE_POOLED", "true")
+
+        assert load_settings().database_pooled is True

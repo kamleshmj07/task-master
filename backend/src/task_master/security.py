@@ -18,11 +18,9 @@ from task_master.config import Settings
 
 logger = logging.getLogger(__name__)
 
-EXEMPT_PATHS = frozenset({"/health"})
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Responses worth a security log line: auth failures, refusals, bad input.
 LOGGED_STATUSES = frozenset({401, 403, 422, 429})
-DOCS_PREFIXES = ("/docs", "/openapi.json")
 
 BASE_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -47,6 +45,13 @@ def install_security(
     write_limiter = RateLimiter(settings.api_write_rate_limit, new_store())
     ip_limiter = RateLimiter(settings.api_ip_rate_limit, new_store())
     headers = security_headers(production=settings.environment == "production")
+    exempt = frozenset(
+        {f"{settings.api_prefix}/health", f"{settings.api_prefix}/health/ready"}
+    )
+    docs_prefixes = (
+        f"{settings.api_prefix}/docs",
+        f"{settings.api_prefix}/openapi.json",
+    )
 
     @app.middleware("http")
     async def handle_security(  # pyright: ignore[reportUnusedFunction]
@@ -57,6 +62,7 @@ def install_security(
         limiter = write_limiter if writing else read_limiter
         refused_by = await _over_limit(
             request,
+            exempt,
             (ip_limiter, f"api-ip:{ip_key(request)}"),
             (limiter, f"{'write' if writing else 'read'}:{client}"),
         )
@@ -65,7 +71,7 @@ def install_security(
         else:
             response = _too_many_requests(refused_by)
         _log_refusal(request, response, client)
-        _add_headers(request, response, headers)
+        _add_headers(request, response, headers, docs_prefixes)
         return response
 
 
@@ -91,10 +97,10 @@ def ip_key(request: Request) -> str:
 
 
 async def _over_limit(
-    request: Request, *budgets: tuple[RateLimiter, str]
+    request: Request, exempt: frozenset[str], *budgets: tuple[RateLimiter, str]
 ) -> RateLimiter | None:
     """Count the request against every budget; return the first one exceeded."""
-    if request.url.path in EXEMPT_PATHS:
+    if request.url.path in exempt:
         return None
     for limiter, key in budgets:
         if not await limiter.hit(key):
@@ -125,8 +131,13 @@ def _log_refusal(request: Request, response: Response, client: str) -> None:
     )
 
 
-def _add_headers(request: Request, response: Response, headers: dict[str, str]) -> None:
-    docs = request.url.path.startswith(DOCS_PREFIXES)
+def _add_headers(
+    request: Request,
+    response: Response,
+    headers: dict[str, str],
+    docs_prefixes: tuple[str, ...],
+) -> None:
+    docs = request.url.path.startswith(docs_prefixes)
     for name, value in headers.items():
         # The development API docs page needs its scripts and styles.
         if docs and name == "Content-Security-Policy":
