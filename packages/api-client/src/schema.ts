@@ -220,7 +220,7 @@ export interface paths {
         put?: never;
         /**
          * Handle Create Goal
-         * @description Create a goal.
+         * @description Create a goal, with the least-used colour unless one is chosen.
          */
         post: operations["handle_create_goal_goals_post"];
         delete?: never;
@@ -797,6 +797,12 @@ export interface components {
             client_secret?: string | null;
         };
         /**
+         * DayMark
+         * @description How a routine went on one day.
+         * @enum {string}
+         */
+        DayMark: "done" | "missed" | "open" | "not_due";
+        /**
          * DeleteAccountRequest
          * @description The current password, so a stolen session cannot delete the account.
          */
@@ -814,6 +820,8 @@ export interface components {
             done: boolean;
             /** Streak */
             streak: number;
+            /** Recent Days */
+            recent_days: components["schemas"]["DayMark"][];
         };
         /** ErrorModel */
         ErrorModel: {
@@ -822,6 +830,15 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /**
+         * GoalColor
+         * @description A goal's soft accent; the order is the order new goals receive them.
+         *
+         *     None of them is green, red or amber, which already mean done, overdue
+         *     and the next step.
+         * @enum {string}
+         */
+        GoalColor: "sky" | "periwinkle" | "lilac" | "mauve" | "steel" | "aqua";
         /**
          * GoalCreate
          * @description New goal.
@@ -833,6 +850,7 @@ export interface components {
             why?: string | null;
             /** Deadline */
             deadline?: string | null;
+            color?: components["schemas"]["GoalColor"] | null;
         };
         /**
          * GoalProgress
@@ -867,6 +885,7 @@ export interface components {
             /** Deadline */
             deadline: string | null;
             status: components["schemas"]["GoalStatus"];
+            color: components["schemas"]["GoalColor"];
             /**
              * Created At
              * Format: date-time
@@ -897,6 +916,7 @@ export interface components {
             /** Deadline */
             deadline?: string | null;
             status?: components["schemas"]["GoalStatus"] | null;
+            color?: components["schemas"]["GoalColor"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

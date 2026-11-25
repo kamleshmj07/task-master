@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Set
 from dataclasses import dataclass
 from datetime import date, timedelta
+from enum import StrEnum
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +74,37 @@ def current_streak(schedule: Schedule, done_on: Set[date], today: date) -> int:
     return streak
 
 
+class DayMark(StrEnum):
+    """How a routine went on one day."""
+
+    DONE = "done"
+    MISSED = "missed"  # due, not ticked, and the day is over
+    OPEN = "open"  # due, not ticked yet, today or later
+    NOT_DUE = "not_due"
+
+
+RECENT_DAYS = 7
+
+
+def recent_marks(
+    schedule: Schedule, done_on: Set[date], day: date, today: date
+) -> list[DayMark]:
+    """The routine's last `RECENT_DAYS` days up to `day`, oldest first."""
+    first = day - timedelta(RECENT_DAYS - 1)
+    return [
+        _mark(schedule, done_on, first + timedelta(offset), today)
+        for offset in range(RECENT_DAYS)
+    ]
+
+
+def _mark(schedule: Schedule, done_on: Set[date], day: date, today: date) -> DayMark:
+    if day in done_on:
+        return DayMark.DONE
+    if not is_due(schedule, day):
+        return DayMark.NOT_DUE
+    return DayMark.MISSED if day < today else DayMark.OPEN
+
+
 def _monthly_day(schedule: Schedule, day: date) -> int:
     last_day = calendar.monthrange(day.year, day.month)[1]
     return min(schedule.day_of_month or 1, last_day)
@@ -80,8 +112,12 @@ def _monthly_day(schedule: Schedule, day: date) -> int:
 
 async def load_due_routines(
     session: AsyncSession, user_id: uuid.UUID, day: date, today: date
-) -> list[tuple[Routine, bool, int]]:
-    """The user's routines due on `day`: each with done-on-`day` and streak."""
+) -> list[tuple[Routine, bool, int, list[DayMark]]]:
+    """The user's routines due on `day`.
+
+    Each comes with whether it was done on `day`, its streak, and how its
+    last few days up to `day` went.
+    """
     statement = (
         select(Routine)
         .where(
@@ -99,6 +135,7 @@ async def load_due_routines(
             routine,
             day in done_by_routine[routine.id],
             current_streak(Schedule.of(routine), done_by_routine[routine.id], today),
+            recent_marks(Schedule.of(routine), done_by_routine[routine.id], day, today),
         )
         for routine in due
     ]

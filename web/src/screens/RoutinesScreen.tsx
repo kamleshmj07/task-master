@@ -1,4 +1,4 @@
-import type { RoutineCreate, RoutineFrequency, RoutineRead } from '@task-master/api-client'
+import type { DueRoutine, RoutineCreate, RoutineFrequency, RoutineRead } from '@task-master/api-client'
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
@@ -6,7 +6,15 @@ import { EmptyState } from '@/components/EmptyState'
 import { Field, FieldGroup } from '@/components/Field'
 import { Modal } from '@/components/Modal'
 import { TimeLimitField } from '@/components/TimeLimitField'
-import { describeSchedule, fromMinutes, timeLimitLabel, type TimeUnit, toMinutes } from '@/data'
+import {
+  describeSchedule,
+  fromMinutes,
+  plural,
+  timeLimitLabel,
+  type TimeUnit,
+  toMinutes,
+  weekSummary,
+} from '@/data'
 import { addDays, formatDay, todayIso, WEEKDAYS } from '@/dates'
 import { focusFormUnder } from '@/emptyStates'
 import { useResource } from '@/useResource'
@@ -16,16 +24,27 @@ async function loadRoutines(): Promise<RoutineRead[]> {
   return data ?? []
 }
 
-/** Recurring routines: create, edit and remove them. Tick them off on Today. */
+async function loadDueToday(): Promise<DueRoutine[]> {
+  const { data } = await api.GET('/routines/due')
+  return data ?? []
+}
+
+/** Recurring routines: tick off today's, see the last week, and manage them all. */
 export function RoutinesScreen() {
   const routines = useResource(loadRoutines)
+  const due = useResource(loadDueToday)
   const [editing, setEditing] = useState<RoutineRead | null>(null)
   const [deleting, setDeleting] = useState<RoutineRead | null>(null)
+
+  function reloadAll() {
+    void routines.reload()
+    void due.reload()
+  }
 
   async function handleDelete(routine: RoutineRead) {
     await api.DELETE('/routines/{routine_id}', { params: { path: { routine_id: routine.id } } })
     setDeleting(null)
-    await routines.reload()
+    reloadAll()
   }
 
   return (
@@ -42,8 +61,10 @@ export function RoutinesScreen() {
 
       <section className="card stack" aria-labelledby="new-routine-heading">
         <h2 id="new-routine-heading">New routine</h2>
-        <RoutineForm submitLabel="Add routine" onSaved={() => void routines.reload()} />
+        <RoutineForm submitLabel="Add routine" onSaved={reloadAll} />
       </section>
+
+      {due.data && due.data.length > 0 && <DueToday routines={due.data} onChanged={() => void due.reload()} />}
 
       {routines.data?.length === 0 && (
         <EmptyState
@@ -57,6 +78,10 @@ export function RoutinesScreen() {
         </EmptyState>
       )}
       {routines.data && routines.data.length > 0 && (
+        <section className="stack-sm" aria-labelledby="all-routines-heading">
+        <h2 id="all-routines-heading" className="group-head">
+          All routines <span className="group-count">{routines.data.length}</span>
+        </h2>
         <ul className="panel plain-list">
           {routines.data.map((routine) => (
             <li key={routine.id} className="list-row">
@@ -82,6 +107,7 @@ export function RoutinesScreen() {
             </li>
           ))}
         </ul>
+        </section>
       )}
 
       {editing && (
@@ -91,7 +117,7 @@ export function RoutinesScreen() {
             submitLabel="Save changes"
             onSaved={() => {
               setEditing(null)
-              void routines.reload()
+              reloadAll()
             }}
             onCancel={() => setEditing(null)}
           />
@@ -115,6 +141,73 @@ export function RoutinesScreen() {
         </Modal>
       )}
     </section>
+  )
+}
+
+interface DueTodayProps {
+  routines: DueRoutine[]
+  onChanged: () => void
+}
+
+/** Today's routines: a big tick each, the last seven days, and the streak. */
+function DueToday({ routines, onChanged }: DueTodayProps) {
+  const today = todayIso()
+  const done = routines.filter((due) => due.done).length
+
+  async function handleToggle({ routine, done: isDone }: DueRoutine) {
+    const params = { path: { routine_id: routine.id, day: today } }
+    if (isDone) await api.DELETE('/routines/{routine_id}/completions/{day}', { params })
+    else await api.PUT('/routines/{routine_id}/completions/{day}', { params })
+    onChanged()
+  }
+
+  return (
+    <section className="stack-sm" aria-labelledby="due-today-heading">
+      <h2 id="due-today-heading" className="group-head between">
+        Due today
+        <span className={done === routines.length ? 'gain small' : 'muted small'}>
+          {done} of {routines.length} done
+        </span>
+      </h2>
+      <ul className="panel plain-list">
+        {routines.map((due) => (
+          <li key={due.routine.id} className="routine-due">
+            <button
+              type="button"
+              className="routine-tick"
+              aria-pressed={due.done}
+              aria-label={`Done today: ${due.routine.title}`}
+              onClick={() => void handleToggle(due)}
+            >
+              {due.done && <TickIcon />}
+            </button>
+            <div className="grow">
+              <p className="title">{due.routine.title}</p>
+              <p className="meta">
+                {describeSchedule(due.routine)}
+                {due.routine.time_limit_minutes ? `, ${timeLimitLabel(due.routine.time_limit_minutes)}` : ''}
+              </p>
+            </div>
+            <span className="week-dots" role="img" aria-label={weekSummary(due.recent_days)}>
+              {due.recent_days.map((mark, index) => (
+                <span key={index} className={`week-dot ${mark}`} />
+              ))}
+            </span>
+            <span className={due.streak > 0 ? 'routine-streak lit' : 'routine-streak'}>
+              {due.streak > 0 ? `${plural(due.streak, 'day')} in a row` : 'No streak yet'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function TickIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
   )
 }
 

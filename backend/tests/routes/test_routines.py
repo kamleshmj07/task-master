@@ -173,6 +173,17 @@ class TestDueRoutines:
         due = response.json()[0]
         assert (due["done"], due["streak"]) == (True, 2)
 
+    async def test_reports_the_last_seven_days(
+        self, api_client: AsyncClient, auth_headers: Headers
+    ) -> None:
+        routine = await create_routine(api_client, auth_headers)
+        await api_client.put(completion_url(routine, YESTERDAY), headers=auth_headers)
+
+        response = await api_client.get("/routines/due", headers=auth_headers)
+
+        recent = response.json()[0]["recent_days"]
+        assert (len(recent), recent[-2:]) == (7, ["done", "open"])
+
 
 class TestTicking:
     async def test_tick_marks_the_day_done(

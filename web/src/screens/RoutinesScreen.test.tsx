@@ -1,10 +1,12 @@
+import type { DayMark, DueRoutine } from '@task-master/api-client'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { todayIso } from '@/dates'
 import { RoutinesScreen } from '@/screens/RoutinesScreen'
 import { findA11yViolations } from '@/test/axe'
-import { makeRoutine } from '@/test/fixtures'
+import { makeDueRoutine, makeRoutine } from '@/test/fixtures'
 import { mockApi, ok } from '@/test/mockApi'
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -105,6 +107,75 @@ describe('RoutinesScreen', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<RoutinesScreen />)
     await screen.findByText(/^Mon, Wed/)
+
+    expect(await findA11yViolations(container)).toEqual([])
+  })
+})
+
+describe('RoutinesScreen due today', () => {
+  const WATER = makeRoutine({ id: 'r2', title: 'Water the plants' })
+
+  function mockDue(due: DueRoutine[]) {
+    mockApi.GET.mockImplementation((path: string) =>
+      ok(path === '/routines/due' ? due : path === '/routines' ? [WORKOUT, WATER] : []),
+    )
+  }
+
+  it('lists only the routines due today, with how many are done', async () => {
+    mockDue([makeDueRoutine({ routine: WATER, done: true, streak: 12 })])
+    render(<RoutinesScreen />)
+
+    const section = await screen.findByRole('region', { name: /Due today/ })
+
+    expect(within(section).getByText('Water the plants')).toBeInTheDocument()
+    expect(section).toHaveTextContent('1 of 1 done')
+    expect(section).toHaveTextContent('12 days in a row')
+  })
+
+  it('reads the last seven days aloud', async () => {
+    const recentDays: DayMark[] = ['done', 'missed', 'not_due', 'done', 'done', 'not_due', 'open']
+    mockDue([makeDueRoutine({ routine: WATER, recent_days: recentDays })])
+    render(<RoutinesScreen />)
+
+    expect(await screen.findByRole('img', { name: 'Last 7 days: done 3 of 5 days it was due' })).toBeInTheDocument()
+  })
+
+  it('ticks a routine off for today', async () => {
+    mockDue([makeDueRoutine({ routine: WATER })])
+    mockApi.PUT.mockReturnValue(ok(undefined))
+    render(<RoutinesScreen />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Done today: Water the plants' }))
+
+    expect(mockApi.PUT).toHaveBeenCalledWith('/routines/{routine_id}/completions/{day}', {
+      params: { path: { routine_id: 'r2', day: todayIso() } },
+    })
+  })
+
+  it('unticks a routine already done today', async () => {
+    mockDue([makeDueRoutine({ routine: WATER, done: true })])
+    render(<RoutinesScreen />)
+
+    const tick = await screen.findByRole('button', { name: 'Done today: Water the plants' })
+    expect(tick).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(tick)
+
+    expect(mockApi.DELETE).toHaveBeenCalledWith('/routines/{routine_id}/completions/{day}', {
+      params: { path: { routine_id: 'r2', day: todayIso() } },
+    })
+  })
+
+  it('hides the section when nothing is due', async () => {
+    render(<RoutinesScreen />)
+    await screen.findByText(/^Mon, Wed/)
+
+    expect(screen.queryByRole('region', { name: /Due today/ })).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations with routines due', async () => {
+    mockDue([makeDueRoutine({ routine: WATER, done: true, streak: 3 })])
+    const { container } = render(<RoutinesScreen />)
+    await screen.findByRole('region', { name: /Due today/ })
 
     expect(await findA11yViolations(container)).toEqual([])
   })

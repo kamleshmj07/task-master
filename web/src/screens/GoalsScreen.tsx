@@ -1,11 +1,11 @@
-import type { GoalRead, GoalStatus } from '@task-master/api-client'
+import type { GoalColor, GoalRead, GoalStatus } from '@task-master/api-client'
 import { type FormEvent, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { EmptyState } from '@/components/EmptyState'
-import { Field } from '@/components/Field'
+import { Field, FieldGroup } from '@/components/Field'
 import { Modal } from '@/components/Modal'
-import { goalHealth, plural } from '@/data'
+import { GOAL_COLORS, goalHealth, plural } from '@/data'
 import { formatDay, todayIso } from '@/dates'
 import { DEFAULT_GOAL_TITLE } from '@/onboarding'
 import { focusFormUnder } from '@/emptyStates'
@@ -123,8 +123,11 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: GoalRead; onEdit: () => vo
   const percent = progress.total_tasks ? Math.round((progress.done_tasks / progress.total_tasks) * 100) : 0
 
   return (
-    <li className="panel goal-card">
-      <div className="row between nowrap">
+    <li className="panel goal-card" data-goal-color={goal.color}>
+      <div className="goal-head">
+        <span className="goal-badge" aria-hidden="true">
+          <span className="goal-dot" />
+        </span>
         <div className="grow">
           <h3 className="goal-title">{goal.title}</h3>
           {goal.why && <p className="muted">{goal.why}</p>}
@@ -140,8 +143,13 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: GoalRead; onEdit: () => vo
       </div>
 
       <div className="goal-progress">
+        <p className="strong">
+          {progress.total_tasks === 0
+            ? 'No tasks yet'
+            : `${progress.done_tasks} of ${plural(progress.total_tasks, 'task')} done`}
+        </p>
         <div
-          className="bar wide"
+          className="bar"
           role="progressbar"
           aria-label={`Progress of “${goal.title}”`}
           aria-valuemin={0}
@@ -150,11 +158,6 @@ function GoalCard({ goal, onEdit, onDelete }: { goal: GoalRead; onEdit: () => vo
         >
           <span style={{ width: `${percent}%` }} />
         </div>
-        <p className="small">
-          {progress.total_tasks === 0
-            ? 'No tasks yet'
-            : `${progress.done_tasks} of ${plural(progress.total_tasks, 'task')} done`}
-        </p>
       </div>
 
       <ul className="facts goal-facts">
@@ -183,13 +186,17 @@ function GoalForm({ goal, submitLabel, onSaved, onCancel }: GoalFormProps) {
   const [why, setWhy] = useState(goal?.why ?? '')
   const [deadline, setDeadline] = useState(goal?.deadline ?? '')
   const [status, setStatus] = useState<GoalStatus>(goal?.status ?? 'active')
+  const [color, setColor] = useState<GoalColor>(goal?.color ?? 'sky')
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     const fields = { title, why: why || null, deadline: deadline || null }
     const { error: apiError } = goal
-      ? await api.PATCH('/goals/{goal_id}', { params: { path: { goal_id: goal.id } }, body: { ...fields, status } })
+      ? await api.PATCH('/goals/{goal_id}', {
+          params: { path: { goal_id: goal.id } },
+          body: { ...fields, status, color },
+        })
       : await api.POST('/goals', { body: fields })
     if (apiError) {
       setError(errorMessage(apiError))
@@ -234,6 +241,25 @@ function GoalForm({ goal, submitLabel, onSaved, onCancel }: GoalFormProps) {
           </Field>
         )}
       </div>
+      {goal && (
+        <FieldGroup label="Colour" info="Shown on the goal's tasks, so you can tell goals apart at a glance.">
+          <div className="row">
+            {GOAL_COLORS.map(({ value, label }) => (
+              <label key={value} className="choice color-choice" data-goal-color={value}>
+                <input
+                  type="radio"
+                  name="goal-color"
+                  value={value}
+                  checked={color === value}
+                  onChange={() => setColor(value)}
+                />
+                <span className="goal-dot" aria-hidden="true" />
+                {label}
+              </label>
+            ))}
+          </div>
+        </FieldGroup>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}

@@ -1,9 +1,9 @@
 import type { PostponeResponse, TaskRead } from '@task-master/api-client'
-import { useCallback, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { api } from '@/api'
 import { Modal } from '@/components/Modal'
-import { groupReview, groupScheduled, loadGoals, type TaskGroup } from '@/data'
+import { goalsById, groupReview, groupScheduled, loadGoals, type TaskGroup } from '@/data'
 import { todayIso } from '@/dates'
 import { EditTaskDialog } from '@/screens/EditTaskDialog'
 import { EmptyState } from '@/components/EmptyState'
@@ -49,10 +49,7 @@ export function TasksScreen() {
   const [suggestion, setSuggestion] = useState<PostponeResponse | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const goalTitle = useCallback(
-    (id: string | null) => goals.data?.find((goal) => goal.id === id)?.title ?? null,
-    [goals.data],
-  )
+  const goalById = useMemo(() => goalsById(goals.data), [goals.data])
 
   const inView = tasks.tasks ?? []
   const count = (id: View) => tasks.counts?.[id] ?? 0
@@ -147,17 +144,19 @@ export function TasksScreen() {
         </div>
         <div className="chips" role="group" aria-label="Filter by goal">
           {[
-            { id: 'all', title: 'All goals' },
+            { id: 'all', title: 'All goals', color: null },
             ...(goals.data ?? []),
-            { id: 'none', title: 'No goal' },
-          ].map(({ id, title }) => (
+            { id: 'none', title: 'No goal', color: null },
+          ].map(({ id, title, color }) => (
             <button
               key={id}
               type="button"
               className="chip"
               aria-pressed={goalFilter === id}
+              data-goal-color={color ?? undefined}
               onClick={() => setGoalFilter(id)}
             >
+              {color && <span className="goal-dot" aria-hidden="true" />}
               {title}
             </button>
           ))}
@@ -187,7 +186,7 @@ export function TasksScreen() {
               key={task.id}
               task={task}
               today={today}
-              goalTitle={goalTitle(task.goal_id)}
+              goal={(task.goal_id && goalById.get(task.goal_id)) || null}
               open={openId === task.id}
               onToggleOpen={() => setOpenId(openId === task.id ? null : task.id)}
               onChanged={handleChanged}

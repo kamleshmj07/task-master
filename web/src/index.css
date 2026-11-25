@@ -1,30 +1,42 @@
 /*
- * "Desk lamp": a dark blue-slate room, warm paper text, and one lamp.
- * Amber marks only the next step and keyboard focus; green = done, red =
- * overdue or lost. Primary actions are paper-filled, not amber.
+ * "First light" on the "Desk lamp" design: a soft graphite room, warm paper
+ * text, and one lamp. Amber marks only the next step and keyboard focus;
+ * green = done, red = overdue or lost. Goals carry one soft colour each
+ * (chips, badges, progress bars), never green, red or amber. Primary
+ * actions are paper-filled, not amber.
  */
 :root {
   color-scheme: dark;
-  --ink: #161a24;
-  --ink-bar: #131721;
-  --slate: #1f2533;
-  --slate-raised: #283042;
-  --slate-hover: #2e3649;
-  --line: #2c3446;
-  --line-strong: #3a4357;
-  --paper: #ece6d9;
-  --paper-bright: #fff8ea;
-  --paper-soft: #c9c3b6;
-  --paper-muted: #a29e95;
-  --paper-faint: #9a968e;
-  --lamp: #f2b544;
-  --lamp-glow: rgb(242 181 68 / 16%);
-  --done: #4fb477;
-  --done-text: #7fd29e;
-  --done-bg: #2a4a38;
+  --ink: #1e1f24;
+  --ink-bar: #19191d;
+  --bar-line: #2f3138;
+  --slate: #292b32;
+  --slate-raised: #33353e;
+  --slate-hover: #3c3f49;
+  --line: #363840;
+  --line-strong: #474a56;
+  --track: #40434d;
+  --paper: #f2ede3;
+  --paper-bright: #ffffff;
+  --paper-soft: #d4d5da;
+  --paper-muted: #b0b1b8;
+  --paper-faint: #a3a4ab;
+  --lamp: #f6c25a;
+  --lamp-glow: rgb(246 194 90 / 16%);
+  --lamp-wash: rgb(246 194 90 / 10%);
+  --done: #5fc98f;
+  --done-text: #86dcaa;
+  --done-bg: #24443a;
+  --done-glow: rgb(95 201 143 / 18%);
   --overdue: #e5604f;
-  --overdue-text: #f2806f;
-  --overdue-bg: #3b2326;
+  --overdue-text: #f28b7c;
+  --overdue-bg: #432a2c;
+  --goal-sky: #8fb8ea;
+  --goal-periwinkle: #a7a8ee;
+  --goal-lilac: #c6a3e2;
+  --goal-mauve: #d8a4c2;
+  --goal-steel: #a3b5c9;
+  --goal-aqua: #84c5d6;
   --radius-dialog: 16px;
   --radius-panel: 12px;
   --radius-control: 8px;
@@ -397,7 +409,7 @@ legend {
 /* Top bar */
 .topbar {
   background: var(--ink-bar);
-  border-bottom: 1px solid #232a3a;
+  border-bottom: 1px solid var(--bar-line);
 }
 .topbar-inner {
   max-width: 980px;
@@ -428,16 +440,18 @@ legend {
 .nav button {
   border-color: transparent;
   color: var(--paper-muted);
-  border-radius: 0;
-  padding: 0 12px;
+  padding: 0 14px;
 }
 .nav button:hover:not(:disabled) {
-  background: none;
+  background: var(--slate);
   color: var(--paper);
 }
 .nav button[aria-current='page'] {
   color: var(--paper);
-  box-shadow: inset 0 -2px 0 var(--paper);
+  background: var(--slate-raised);
+}
+.nav button[aria-current='page']:hover:not(:disabled) {
+  background: var(--slate-hover);
 }
 .account,
 .bell {
@@ -528,7 +542,7 @@ legend {
   gap: 10px;
   align-items: flex-start;
   padding: 14px 18px;
-  border-top: 1px solid #323b50;
+  border-top: 1px solid var(--line);
 }
 .note.unread {
   background: var(--slate-hover);
@@ -548,39 +562,93 @@ legend {
   color: var(--paper-soft);
 }
 
-/* View tabs and goal filter */
+/* View tabs (a segmented bar) and goal filter */
 .tabs {
   display: flex;
-  gap: var(--space-7);
-  border-bottom: 1px solid var(--line);
+  gap: 6px;
   flex-wrap: wrap;
+  align-self: flex-start;
+  padding: 6px;
+  background: var(--slate);
+  border-radius: var(--radius-panel);
 }
 .tabs button {
-  min-height: 0;
-  padding: 12px 0 14px;
+  min-height: 44px;
+  padding: 0 16px;
   border: 0;
-  border-bottom: 3px solid transparent;
-  border-radius: 0;
-  margin-bottom: -1px;
   color: var(--paper-muted);
   font-size: 16px;
-  gap: 10px;
+  gap: 8px;
 }
 .tabs button:hover:not(:disabled) {
-  background: none;
+  background: var(--slate-raised);
   color: var(--paper);
 }
 .tabs button[aria-selected='true'] {
-  color: var(--paper);
-  border-bottom-color: var(--paper);
+  color: var(--ink);
+  background: var(--paper);
+}
+.tabs button[aria-selected='true']:hover:not(:disabled) {
+  background: var(--paper-bright);
 }
 .count {
   font-weight: 500;
-  color: var(--paper-muted);
+  color: inherit;
+  opacity: 0.8;
 }
 .count.loss {
+  opacity: 1;
   color: var(--overdue-text);
+  background: var(--overdue-bg);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 14px;
   font-weight: 700;
+}
+
+/* Goal colours: a dot on chips and facts, a badge and bar on goal cards */
+[data-goal-color='sky'] {
+  --goal: var(--goal-sky);
+}
+[data-goal-color='periwinkle'] {
+  --goal: var(--goal-periwinkle);
+}
+[data-goal-color='lilac'] {
+  --goal: var(--goal-lilac);
+}
+[data-goal-color='mauve'] {
+  --goal: var(--goal-mauve);
+}
+[data-goal-color='steel'] {
+  --goal: var(--goal-steel);
+}
+[data-goal-color='aqua'] {
+  --goal: var(--goal-aqua);
+}
+.goal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.goal-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--goal, var(--paper-muted));
+}
+.goal-badge {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--goal) 16%, transparent);
+  display: inline-grid;
+  place-items: center;
+}
+.goal-badge .goal-dot {
+  width: 14px;
+  height: 14px;
 }
 .chips {
   display: flex;
@@ -737,7 +805,7 @@ legend {
 }
 @keyframes glow {
   from {
-    background: rgb(242 181 68 / 22%);
+    background: rgb(246 194 90 / 22%);
   }
   to {
     background: transparent;
@@ -837,7 +905,7 @@ legend {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgb(10 12 18 / 72%);
+  background: rgb(14 14 17 / 72%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -886,7 +954,7 @@ legend {
 }
 .reason.selected,
 .reason.selected:hover:not(:disabled) {
-  background: #323b50;
+  background: var(--slate-hover);
   border-color: var(--paper);
   color: var(--paper);
 }
@@ -905,7 +973,7 @@ legend {
   margin-top: var(--space-1);
 }
 .danger-zone {
-  box-shadow: inset 0 0 0 1px #5a2a2c;
+  box-shadow: inset 0 0 0 1px var(--overdue-bg);
 }
 
 /* Form fields: a label row (label and optional info button) over the control */
@@ -1133,34 +1201,52 @@ legend {
   border-top: 0;
 }
 .goal-card {
-  padding: 18px var(--space-5);
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
+}
+.goal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
 }
 .goal-title {
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 800;
 }
 .goal-progress {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
 }
-.bar.wide {
-  width: min(240px, 50%);
-  height: 6px;
-  border-radius: 3px;
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--goal, var(--done));
 }
 .goal-facts {
   list-style: none;
   padding: 0;
   margin: 0;
 }
-.day-choice {
+.day-choice,
+.color-choice {
   min-height: 40px;
   padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
+}
+.color-choice:has(input:checked) {
+  border-color: var(--paper);
+  background: var(--slate-raised);
 }
 
 /* Postponement history under an expanded task */
@@ -1366,8 +1452,29 @@ legend {
 }
 .today-rank.done {
   border: none;
+  background: var(--done);
+  color: var(--ink);
+  box-shadow: 0 0 0 6px var(--done-glow);
+}
+/* A finished task sits on a green row; its tick glows once when it lands. */
+.today-item.finished {
   background: var(--done-bg);
-  color: var(--done-text);
+}
+.today-item.finished .today-rank.done {
+  animation: land 900ms ease-out;
+}
+@keyframes land {
+  from {
+    box-shadow: 0 0 0 0 rgb(95 201 143 / 55%);
+  }
+  to {
+    box-shadow: 0 0 0 6px var(--done-glow);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .today-item.finished .today-rank.done {
+    animation: none;
+  }
 }
 .today-start {
   font-size: 13px;
@@ -1480,6 +1587,68 @@ label.today-routine:hover {
 .today-routine.done .today-streak {
   color: var(--done-text);
 }
+
+/* Routines page: today's ticks and the last seven days */
+.routine-due {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.routine-due:first-child {
+  border-top: 0;
+}
+.routine-tick {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+}
+.routine-tick:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--done-text);
+}
+.routine-tick[aria-pressed='true'],
+.routine-tick[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--done);
+  border-color: var(--done);
+  color: var(--ink);
+  box-shadow: 0 0 0 6px var(--done-glow);
+}
+.week-dots {
+  display: flex;
+  gap: 6px;
+}
+.week-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--track);
+}
+.week-dot.done {
+  background: var(--done);
+  border-color: var(--done);
+}
+.week-dot.missed {
+  background: var(--line-strong);
+  border-color: var(--line-strong);
+}
+.week-dot.open {
+  border-color: var(--paper-muted);
+}
+.routine-streak {
+  min-width: 96px;
+  text-align: right;
+  color: var(--paper-soft);
+  font-weight: 600;
+}
+.routine-streak.lit {
+  color: var(--done-text);
+}
 .today-heads-up {
   padding: 0 var(--space-5);
 }
@@ -1534,7 +1703,7 @@ label.today-routine:hover {
   padding: 36px var(--space-6);
 }
 .lamp-art.glow {
-  background: radial-gradient(circle at 70% 75%, rgb(242 181 68 / 22%), var(--ink-bar) 62%);
+  background: radial-gradient(circle at 70% 75%, rgb(246 194 90 / 22%), var(--ink-bar) 62%);
 }
 .lamp-ray {
   stroke: var(--line);
@@ -1591,7 +1760,7 @@ label.today-routine:hover {
 }
 .lamp-step.current {
   border-color: var(--lamp);
-  background: rgb(242 181 68 / 6%);
+  background: rgb(246 194 90 / 6%);
   padding-block: 18px;
 }
 .lamp-node {

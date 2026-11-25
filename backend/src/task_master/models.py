@@ -39,6 +39,21 @@ class GoalStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class GoalColor(StrEnum):
+    """A goal's soft accent; the order is the order new goals receive them.
+
+    None of them is green, red or amber, which already mean done, overdue
+    and the next step.
+    """
+
+    SKY = "sky"
+    PERIWINKLE = "periwinkle"
+    LILAC = "lilac"
+    MAUVE = "mauve"
+    STEEL = "steel"
+    AQUA = "aqua"
+
+
 class RoutineFrequency(StrEnum):
     """How often a routine repeats."""
 
@@ -189,6 +204,9 @@ class Goal(TimestampMixin, Base):
     deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[GoalStatus] = mapped_column(
         _enum_column(GoalStatus), default=GoalStatus.ACTIVE
+    )
+    color: Mapped[GoalColor] = mapped_column(
+        _enum_column(GoalColor), default=GoalColor.SKY
     )
 
 

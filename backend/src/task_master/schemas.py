@@ -16,6 +16,7 @@ from pydantic import (
 
 from task_master.models import (
     POSTPONE_NOTE_MAX_LENGTH,
+    GoalColor,
     GoalStatus,
     Notification,
     NotificationKind,
@@ -24,6 +25,7 @@ from task_master.models import (
     TaskStatus,
     TaskStep,
 )
+from task_master.routines import DayMark
 
 Title = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
@@ -67,17 +69,20 @@ class GoalCreate(BaseModel):
     title: Title
     why: Why | None = None
     deadline: date | None = None
+    # Leave it out to get the colour the user's active goals use least.
+    color: GoalColor | None = None
 
 
 class GoalUpdate(PatchModel):
     """Partial goal update."""
 
-    REQUIRED_IF_SET = frozenset({"title", "status"})
+    REQUIRED_IF_SET = frozenset({"title", "status", "color"})
 
     title: Title | None = None
     why: Why | None = None
     deadline: date | None = None
     status: GoalStatus | None = None
+    color: GoalColor | None = None
 
 
 class GoalSummary(BaseModel):
@@ -90,6 +95,7 @@ class GoalSummary(BaseModel):
     why: str | None
     deadline: date | None
     status: GoalStatus
+    color: GoalColor
     created_at: datetime
     updated_at: datetime
 
@@ -467,6 +473,8 @@ class DueRoutine(BaseModel):
     routine: RoutineRead
     done: bool
     streak: int
+    # The 7 days up to and including that day, oldest first.
+    recent_days: list[DayMark]
 
 
 class PlanUpdate(BaseModel):

@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from task_master.auth.users import CurrentUserDep
 from task_master.dependencies import SessionDep
+from task_master.goal_colors import next_goal_color
 from task_master.goal_progress import read_goals
 from task_master.models import Goal, GoalStatus
 from task_master.queries import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, get_owned_or_404
@@ -20,8 +21,10 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 async def handle_create_goal(
     body: GoalCreate, user: CurrentUserDep, session: SessionDep
 ) -> GoalRead:
-    """Create a goal."""
-    goal = Goal(user_id=user.id, **body.model_dump())
+    """Create a goal, with the least-used colour unless one is chosen."""
+    fields = body.model_dump()
+    fields["color"] = body.color or await next_goal_color(session, user.id)
+    goal = Goal(user_id=user.id, **fields)
     session.add(goal)
     await session.commit()
     await session.refresh(goal)

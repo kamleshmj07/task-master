@@ -1,4 +1,4 @@
-import type { GoalRead, RoutineRead, TaskRead } from '@task-master/api-client'
+import type { DueRoutine, GoalRead, RoutineRead, TaskRead } from '@task-master/api-client'
 
 /** A to-do task with two unfinished steps, unless overridden. */
 export function makeTask(overrides: Partial<TaskRead> = {}): TaskRead {
@@ -51,6 +51,7 @@ export function makeGoal(overrides: Partial<GoalRead> = {}): GoalRead {
     why: null,
     deadline: null,
     status: 'active',
+    color: 'sky',
     created_at: '2026-11-01T00:00:00Z',
     updated_at: '2026-11-20T00:00:00Z',
     progress: {
@@ -59,6 +60,17 @@ export function makeGoal(overrides: Partial<GoalRead> = {}): GoalRead {
       next_due_task: null,
       last_moved_at: '2026-11-20T00:00:00Z',
     },
+    ...overrides,
+  }
+}
+
+/** A routine due on the day, not ticked yet, with a quiet last week. */
+export function makeDueRoutine(overrides: Partial<DueRoutine> = {}): DueRoutine {
+  return {
+    routine: makeRoutine(),
+    done: false,
+    streak: 0,
+    recent_days: ['not_due', 'not_due', 'not_due', 'not_due', 'not_due', 'not_due', 'open'],
     ...overrides,
   }
 }

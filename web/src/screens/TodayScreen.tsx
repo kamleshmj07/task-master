@@ -12,9 +12,10 @@ import { useCallback, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { useAuth } from '@/authContext'
+import { type GoalLabel, GoalTag } from '@/components/GoalTag'
 import { LightTheLamp } from '@/components/LightTheLamp'
 import { Modal } from '@/components/Modal'
-import { describeRepeat, loadGoals, plural, timeLimitLabel } from '@/data'
+import { describeRepeat, goalsById, loadGoals, plural, timeLimitLabel } from '@/data'
 import { addDays, dueLabel, formatDay, todayIso } from '@/dates'
 import { useNavigation } from '@/navigation'
 import { hideFor, isHiddenFor } from '@/onboarding'
@@ -85,7 +86,7 @@ export function TodayScreen() {
   const isToday = day === today
   const topThree = plan.data?.top_three ?? []
   const ids = topThree.map((item) => item.task.id)
-  const goalTitles = new Map((goals.data ?? []).map((goal: GoalRead) => [goal.id, goal.title]))
+  const goalById = goalsById(goals.data)
 
   async function savePlan(taskIds: string[]) {
     const { error: apiError } = await api.PUT('/plans/{plan_date}', {
@@ -172,7 +173,7 @@ export function TodayScreen() {
             day={day}
             today={today}
             readOnly={isPast}
-            goalTitles={goalTitles}
+            goalById={goalById}
             onSave={(next) => void savePlan(next)}
             onChanged={(task, allStepsDone) => {
               if (allStepsDone) setConfirming(task)
@@ -274,7 +275,7 @@ interface TopThreeProps {
   day: string
   today: string
   readOnly: boolean
-  goalTitles: Map<string, string>
+  goalById: Map<string, GoalLabel>
   onSave: (taskIds: string[]) => void
   onChanged: (task: TaskRead, allStepsDone: boolean) => void
   onComplete: (task: TaskRead) => void
@@ -284,7 +285,7 @@ interface TopThreeProps {
 }
 
 /** The day's three, in order; the first open one is lit with its steps open. */
-function TopThree({ plan, day, today, readOnly, goalTitles, onSave, onChanged, onComplete, onReopen, onPostpone, onEdit }: TopThreeProps) {
+function TopThree({ plan, day, today, readOnly, goalById, onSave, onChanged, onComplete, onReopen, onPostpone, onEdit }: TopThreeProps) {
   const [changing, setChanging] = useState(false)
   // Steps the user opened or closed; the focus task starts open.
   const [toggled, setToggled] = useState<Record<string, boolean>>({})
@@ -317,12 +318,12 @@ function TopThree({ plan, day, today, readOnly, goalTitles, onSave, onChanged, o
           const isFocus = task.id === focusId
           const open = toggled[task.id] ?? isFocus
           return (
-            <li key={task.id} className={isFocus ? 'today-item focus' : 'today-item'}>
+            <li key={task.id} className={task.status === 'done' ? 'today-item finished' : isFocus ? 'today-item focus' : 'today-item'}>
               <ThreeItem
                 rank={rank}
                 task={task}
                 today={today}
-                goalTitle={task.goal_id ? goalTitles.get(task.goal_id) : undefined}
+                goal={task.goal_id ? goalById.get(task.goal_id) : undefined}
                 focus={isFocus}
                 open={open}
                 readOnly={readOnly}
@@ -372,7 +373,7 @@ interface ThreeItemProps {
   rank: number
   task: TaskRead
   today: string
-  goalTitle: string | undefined
+  goal: GoalLabel | undefined
   focus: boolean
   open: boolean
   readOnly: boolean
@@ -384,7 +385,7 @@ interface ThreeItemProps {
   onEdit: (task: TaskRead) => void
 }
 
-function ThreeItem({ rank, task, today, goalTitle, focus, open, readOnly, onToggle, onChanged, onComplete, onReopen, onPostpone, onEdit }: ThreeItemProps) {
+function ThreeItem({ rank, task, today, goal, focus, open, readOnly, onToggle, onChanged, onComplete, onReopen, onPostpone, onEdit }: ThreeItemProps) {
   const done = task.status === 'done'
   const finished = stepsDone(task)
   const limit = timeLimitLabel(task.time_limit_minutes)
@@ -432,7 +433,7 @@ function ThreeItem({ rank, task, today, goalTitle, focus, open, readOnly, onTogg
             </span>
             {limit && <span>{limit} limit</span>}
             {task.repeat && <span>{describeRepeat(task.repeat)}</span>}
-            {goalTitle && <span>{goalTitle}</span>}
+            {goal && <GoalTag goal={goal} />}
           </div>
           {!focus && task.next_step && <p className="today-next-quiet">Next: {task.next_step}</p>}
         </div>

@@ -1,4 +1,6 @@
 import type {
+  DayMark,
+  GoalColor,
   GoalRead,
   PostponeReason,
   RoutineFrequency,
@@ -200,6 +202,28 @@ export function goalHealth(goal: GoalRead, today: string): GoalHealth {
   const quietDays = daysBetween(goal.progress.last_moved_at.slice(0, 10), today)
   const quiet = goal.status === 'active' && quietDays >= QUIET_GOAL_DAYS ? `Quiet for ${quietDays} days` : null
   return { deadline, deadlineUrgent, quiet }
+}
+
+/** Goal colours in palette order, as the picker offers them. */
+export const GOAL_COLORS: { value: GoalColor; label: string }[] = [
+  { value: 'sky', label: 'Sky' },
+  { value: 'periwinkle', label: 'Periwinkle' },
+  { value: 'lilac', label: 'Lilac' },
+  { value: 'mauve', label: 'Mauve' },
+  { value: 'steel', label: 'Steel' },
+  { value: 'aqua', label: 'Aqua' },
+]
+
+/** Look up goals by id, for showing a task's goal. */
+export function goalsById(goals: GoalRead[] | null | undefined): Map<string, GoalRead> {
+  return new Map((goals ?? []).map((goal) => [goal.id, goal]))
+}
+
+/** How a routine's last seven days read aloud, e.g. "done 4 of 5 days it was due". */
+export function weekSummary(days: DayMark[]): string {
+  const due = days.filter((day) => day !== 'not_due').length
+  const done = days.filter((day) => day === 'done').length
+  return due === 0 ? 'Last 7 days: not due' : `Last 7 days: done ${done} of ${plural(due, 'day')} it was due`
 }
 
 /** Short reason names for summaries, e.g. "2 blocked". */

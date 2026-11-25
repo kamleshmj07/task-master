@@ -2,6 +2,7 @@ import type { PostponementRead, PostponeReason, TaskRead } from '@task-master/ap
 import { type FormEvent, useEffect, useState } from 'react'
 
 import { api, errorMessage } from '@/api'
+import { type GoalLabel, GoalTag } from '@/components/GoalTag'
 import { InfoTip } from '@/components/InfoTip'
 import { describeRepeat, postponementSummary, REASONS, timeLimitLabel } from '@/data'
 import { daysBetween, dueLabel, formatDay } from '@/dates'
@@ -11,7 +12,7 @@ import { useNavigation } from '@/navigation'
 interface TaskCardProps {
   task: TaskRead
   today: string
-  goalTitle: string | null
+  goal: GoalLabel | null
   open: boolean
   onToggleOpen: () => void
   /** The task changed on the server; `allStepsDone` asks to confirm completion. */
@@ -24,7 +25,7 @@ interface TaskCardProps {
 export function TaskCard({
   task,
   today,
-  goalTitle,
+  goal,
   open,
   onToggleOpen,
   onChanged,
@@ -69,7 +70,7 @@ export function TaskCard({
             </span>
             {limit && <span>{limit} limit</span>}
             {task.repeat && <span>{describeRepeat(task.repeat)}</span>}
-            {goalTitle && <span>{goalTitle}</span>}
+            {goal && <GoalTag goal={goal} />}
             {task.postpone_count > 0 && (
               <span className="loss strong">
                 {postponementSummary(task.postpone_count, task.postponement_reasons)}
