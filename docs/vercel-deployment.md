@@ -145,7 +145,9 @@ migrations and the clean-up job.
 
 **Done:** `/health` stays a quick "the API is up" answer, and the new
 `/health/ready` also runs `SELECT 1`, answering 503 if the database is
-unreachable. Point uptime checks at `/health/ready`.
+unreachable. Frequent uptime checks call `/health`; `/health/ready` is for a
+daily check and after deploys, because each call wakes the database (see
+step 9).
 
 ### A7. The real client address
 
@@ -289,12 +291,56 @@ Open `https://task-master.vercel.app/api/health/ready`. It should answer
 means `TASK_MASTER_API_PREFIX` is not `/api`; a 503 means the database URL is
 wrong or Neon is unreachable.
 
-### 9. Monitoring
+### 9. Monitoring (and letting the database sleep)
 
-- Add a free uptime check (for example UptimeRobot or Better Stack) on
-  `https://task-master.vercel.app/api/health/ready`, every 5 minutes, alerting by
-  email.
-- Vercel → the project → Logs shows API errors and our JSON security logs.
+**Why it matters.** Neon's free plan gives about 100 compute hours a month
+and saves them by putting the database to sleep after about 5 minutes
+without queries. Anything that queries the database every few minutes keeps
+it awake all month (roughly 180 compute hours at the smallest size), and
+Neon would then pause it until the next month, taking the app down. The app
+itself already hibernates when unused: the API only runs while answering a
+request, and only these wake the database:
+
+| What | How often | Wakes the database? |
+| --- | --- | --- |
+| People using the app | When used | Yes |
+| `/api/health` | Any | **No**: no query, and exempt from rate limiting |
+| `/api/health/ready` | Once a day (uptime check), after deploys | Yes, for a few minutes |
+| Clean-up job | Daily | Yes, briefly |
+| Backup | Nightly | Yes, briefly |
+
+**The uptime check** is the `Uptime check` workflow
+(`.github/workflows/uptime.yml`), free because the repository is public. It
+calls `/api/health` every 15 minutes and `/api/health/ready` once a day at
+07:00 UTC, retrying for about a minute so a sleeping database can wake.
+GitHub emails you when a run fails.
+
+**Turn it on:** GitHub → repository → Settings → Secrets and variables →
+Actions → Variables:
+
+| Variable | Value |
+| --- | --- |
+| `APP_URL` | `https://task-master.vercel.app` (no trailing slash needed) |
+| `UPTIME_CHECK` | `on` |
+
+**Turn it off:** set `UPTIME_CHECK` to `off` (or delete it). Every run is
+then skipped. To stop the schedule entirely, Actions → Uptime check → "…" →
+Disable workflow; "Enable workflow" brings it back.
+
+**Check right now:** Actions → Uptime check → Run workflow. A manual run
+checks `/api/health/ready`, including the database.
+
+Notes:
+
+- GitHub may start scheduled runs a few minutes late; fine for this.
+- In public repositories GitHub disables scheduled workflows after 60 days
+  without repository activity; it emails first, and one click re-enables it.
+- Prefer an outside monitor (UptimeRobot, Better Stack)? Point it at
+  `/api/health` only, never every few minutes at `/api/health/ready`. Its
+  pause and resume buttons do the same job as `UPTIME_CHECK`.
+
+Logs: Vercel → the project → Logs shows API errors and our JSON security
+logs.
 
 ### 10. Backups
 

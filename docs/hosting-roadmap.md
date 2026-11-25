@@ -19,7 +19,7 @@ branch.
 | Phase | What | Guide | Done when |
 | --- | --- | --- | --- |
 | **1. Code** | One-project setup (`vercel.json` with web and API services); API entrypoint; API under `/api` with the refresh cookie path to match; web app calling `/api`; pooled database engine; `/health` checks the database; trusted visitor addresses; web security headers | Part A1–A8, A11 | Tests pass, merged to `master` |
-| **2. Automation** | GitHub workflows: migrate then deploy; daily clean-up; nightly backup | Part A9–A10, step 10 | Workflows in `master` |
+| **2. Automation** | GitHub workflows: migrate then deploy; daily clean-up; nightly backup; uptime check (done: `uptime.yml`, off until `UPTIME_CHECK=on`) | Part A9–A10, step 10 | Workflows in `master` |
 | **3. Accounts** | Vercel Hobby account; Neon Free database (same region as the API); auth secret | Steps 1–3 | Database reachable |
 | **4. First deploy** | Create the project, set environment variables and GitHub secrets, run the deploy workflow | Steps 4–8 | `/api/health/ready` answers ok |
 | **5. Verify** | Smoke test, uptime check, logs | Steps 9, 11 | All smoke-test points pass |
