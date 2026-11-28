@@ -47,21 +47,21 @@ The app itself is production-ready; the infrastructure around it is not built.
   contract check.
 - `/health` endpoint and the clean-up job (`python -m task_master.cleanup`).
 
-**Missing before launch**
+**Before launch: done and still to do** (updated 2026-11-28)
 
 | Area | Gap |
 | --- | --- |
-| Hosting | No host chosen. Everything below depends on it. |
-| Build and run | No Dockerfile; no production build or server for the web app. `docker-compose.yml` only runs the dev database. |
-| Domain and HTTPS | No domain. The web app and API must share one site (for example `tasks.` and `api.` subdomains of one domain) or the sign-in cookie is not sent. |
-| Web security headers | The CSP and other headers in `docs/security.md` must be set wherever the web app is served. |
-| Deploys | No deploy step in CI. Migrations must run on each release. |
-| Secrets | Production secrets and the database URL must live in the host's secret store. |
-| Scheduled job | The clean-up job is not scheduled anywhere. |
-| Backups | No database backups; no tested restore. |
-| Monitoring | No uptime check, error tracking, or log collection. |
+| Hosting | **Decided:** Vercel (see the decision above). |
+| Build and run | **Done for Vercel:** `vercel.json` builds the web app and runs the API (`backend/app.py`); no Dockerfile needed there. |
+| Domain and HTTPS | **Solved for now:** one `vercel.app` address for web and API (HTTPS by Vercel). Own domain later (phase 6). |
+| Web security headers | **Done:** set in `vercel.json`. |
+| Deploys | To do (phase 2): workflow that migrates, then deploys with the Vercel CLI. |
+| Secrets | To do (phases 3–4): Vercel environment variables and GitHub secrets. |
+| Scheduled job | To do (phase 2): daily clean-up workflow. |
+| Backups | To do (phase 2): nightly backup workflow, then one tested restore. |
+| Monitoring | **Uptime check done** (`uptime.yml`, off until switched on); logs in Vercel. No error tracking yet. |
 | Email | No provider: no password reset or email verification, and sign-up still reveals whether an email is taken. |
-| Code gaps | `/health` does not check the database. (The single-process lock is fixed, see below.) |
+| Code gaps | **None left:** `/health/ready` checks the database; the single-process lock is fixed (see below). |
 | Launch basics | Privacy policy and terms; a way for users to export their data. |
 | Optional | The font loads from Google Fonts; serving it ourselves would avoid sending users to a third party. |
 
